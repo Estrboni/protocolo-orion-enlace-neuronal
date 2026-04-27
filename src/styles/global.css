@@ -37,53 +37,101 @@ body::after {
     0deg,
     transparent,
     transparent 2px,
-    rgba(0, 0, 0, 0.08) 2px,
-    rgba(0, 0, 0, 0.08) 4px
+    rgba(0, 0, 0, 0.07) 2px,
+    rgba(0, 0, 0, 0.07) 4px
   );
   pointer-events: none;
   z-index: 9999;
 }
 
-/* Scrollbar */
+/* CRT vignette */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.7) 100%);
+  pointer-events: none;
+  z-index: 9998;
+}
+
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: #000; }
 ::-webkit-scrollbar-thumb { background: var(--neon-green); border-radius: 2px; }
 
-/* Glitch animation */
 @keyframes glitch {
-  0%, 90%, 100% { transform: translate(0); }
-  92% { transform: translate(-2px, 1px); clip-path: inset(20% 0 50% 0); }
-  94% { transform: translate(2px, -1px); clip-path: inset(60% 0 10% 0); }
-  96% { transform: translate(-1px, 2px); }
-}
-
-@keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
+  0%, 88%, 100% { transform: translate(0); filter: none; }
+  90% { transform: translate(-3px, 1px); filter: hue-rotate(90deg); }
+  92% { transform: translate(3px, -1px); filter: hue-rotate(-90deg); }
+  94% { transform: translate(-1px, 2px); filter: none; }
+  96% { transform: translate(2px, -2px); }
 }
 
 @keyframes flicker {
-  0%, 99%, 100% { opacity: 1; }
-  99.5% { opacity: 0.7; }
+  0%, 97%, 100% { opacity: 1; }
+  97.5% { opacity: 0.6; }
+  98% { opacity: 1; }
+  98.5% { opacity: 0.4; }
+  99% { opacity: 1; }
 }
 
 @keyframes pulse-green {
-  0%, 100% { box-shadow: 0 0 5px var(--neon-green); }
-  50% { box-shadow: 0 0 20px var(--neon-green), 0 0 40px var(--neon-green); }
+  0%, 100% { box-shadow: 0 0 8px var(--neon-green), 0 0 16px #00ff4133; }
+  50% { box-shadow: 0 0 20px var(--neon-green), 0 0 40px #00ff4166, 0 0 60px #00ff4122; }
+}
+
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 8px var(--neon-red); }
+  50% { box-shadow: 0 0 24px var(--neon-red), 0 0 48px #ff004044; }
 }
 
 @keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.neon-text { text-shadow: 0 0 7px var(--neon-green), 0 0 10px var(--neon-green); }
-.neon-amber { color: var(--neon-amber); text-shadow: 0 0 7px var(--neon-amber); }
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scanBeam {
+  0% { transform: translateY(-100%); opacity: 0.06; }
+  100% { transform: translateY(100vh); opacity: 0.06; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes nodeFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes enemyPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+@keyframes bootLine {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.neon-text { text-shadow: 0 0 7px var(--neon-green), 0 0 14px #00ff4166; }
+.neon-amber { color: var(--neon-amber); text-shadow: 0 0 7px var(--neon-amber), 0 0 14px #ffb00066; }
 .neon-cyan { color: var(--neon-cyan); text-shadow: 0 0 7px var(--neon-cyan); }
 .neon-red { color: var(--neon-red); text-shadow: 0 0 7px var(--neon-red); }
 
@@ -91,16 +139,6 @@ body::after {
   background: var(--bg-panel);
   border: 1px solid var(--border-color);
   position: relative;
-}
-
-.panel::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border: 1px solid transparent;
-  background: linear-gradient(var(--bg-panel), var(--bg-panel)) padding-box,
-              linear-gradient(135deg, var(--neon-green)22, transparent, var(--neon-green)11) border-box;
-  pointer-events: none;
 }
 
 .panel-header {
@@ -113,12 +151,13 @@ body::after {
   display: flex;
   align-items: center;
   gap: 8px;
+  background: #020a02;
 }
 
 .panel-header::before {
   content: '▶';
   color: var(--neon-green);
-  font-size: 8px;
+  font-size: 7px;
 }
 
 button {
@@ -131,39 +170,83 @@ button {
   font-size: 12px;
   letter-spacing: 2px;
   text-transform: uppercase;
-  transition: all 0.15s;
+  transition: all 0.15s ease;
   position: relative;
   overflow: hidden;
 }
 
+button::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.1), transparent);
+  transition: left 0.3s ease;
+}
+
+button:hover::after { left: 100%; }
+
 button:hover {
   background: var(--neon-green);
   color: #000;
-  box-shadow: 0 0 15px var(--neon-green);
+  box-shadow: 0 0 15px var(--neon-green), 0 0 30px #00ff4133;
 }
 
+button:active { transform: scale(0.97); }
+
 button:disabled {
-  opacity: 0.3;
+  opacity: 0.25;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 button.danger {
   border-color: var(--neon-red);
   color: var(--neon-red);
 }
-
 button.danger:hover {
   background: var(--neon-red);
   color: #000;
   box-shadow: 0 0 15px var(--neon-red);
 }
+button.danger::after { background: linear-gradient(90deg, transparent, rgba(255,0,64,0.1), transparent); }
 
 button.amber {
   border-color: var(--neon-amber);
   color: var(--neon-amber);
 }
-
 button.amber:hover {
   background: var(--neon-amber);
   color: #000;
+  box-shadow: 0 0 15px var(--neon-amber);
 }
+
+/* Tooltip */
+[data-tip] { position: relative; cursor: help; }
+[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #001a00;
+  border: 1px solid #003300;
+  color: #00ff41;
+  font-size: 9px;
+  padding: 3px 8px;
+  white-space: nowrap;
+  letter-spacing: 1px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* Input/select base */
+input, select {
+  font-family: var(--font-mono);
+  background: #000;
+  color: var(--neon-green);
+  border: 1px solid #003300;
+  outline: none;
+  transition: border-color 0.15s;
+}
+input:focus, select:focus { border-color: #00ff41; box-shadow: 0 0 6px #00ff4133; }
