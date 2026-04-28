@@ -72,6 +72,11 @@ body::after {
   50% { box-shadow: 0 0 20px var(--neon-green), 0 0 40px var(--neon-green); }
 }
 
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 5px var(--neon-red); }
+  50% { box-shadow: 0 0 20px var(--neon-red), 0 0 40px var(--neon-red); }
+}
+
 @keyframes blink {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0; }
@@ -80,6 +85,38 @@ body::after {
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+@keyframes dataFlow {
+  0% { opacity: 0; transform: translateY(20px); }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-20px); }
+}
+
+@keyframes enemyAlert {
+  0%, 100% { filter: drop-shadow(0 0 4px #ff0040); }
+  50% { filter: drop-shadow(0 0 12px #ff0040); }
+}
+
+@keyframes nodeFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes bootLine {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes vignette {
+  0%, 100% { box-shadow: inset 0 0 120px rgba(0,0,0,0.3); }
+  50% { box-shadow: inset 0 0 160px rgba(0,0,0,0.5); }
 }
 
 .neon-text { text-shadow: 0 0 7px var(--neon-green), 0 0 10px var(--neon-green); }
@@ -119,6 +156,7 @@ body::after {
   content: '▶';
   color: var(--neon-green);
   font-size: 8px;
+  animation: blink 1.2s infinite;
 }
 
 button {
@@ -134,12 +172,22 @@ button {
   transition: all 0.15s;
   position: relative;
   overflow: hidden;
+  outline: none;
 }
 
 button:hover {
   background: var(--neon-green);
   color: #000;
   box-shadow: 0 0 15px var(--neon-green);
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+button:focus {
+  outline: 2px solid var(--neon-cyan);
+  outline-offset: 2px;
 }
 
 button:disabled {
@@ -166,4 +214,65 @@ button.amber {
 button.amber:hover {
   background: var(--neon-amber);
   color: #000;
+}
+
+input[type="number"], input[type="text"], select {
+  outline: none;
+}
+
+input[type="number"]:focus, input[type="text"]:focus, select:focus {
+  box-shadow: 0 0 8px currentColor;
+  outline: 1px solid currentColor;
+}
+
+/* Mobile responsive */
+@media (max-width: 1024px) {
+  :root {
+    --font-size-hud: 9px;
+  }
+  
+  .panel-header { font-size: 8px; padding: 3px 6px; }
+  button { font-size: 10px; padding: 4px 12px; }
+}
+
+@media (max-width: 768px) {
+  html, body, #root {
+    width: 100%;
+    height: 100%;
+  }
+  
+  .panel-header { font-size: 7px; padding: 2px 4px; }
+  button { font-size: 9px; padding: 3px 8px; }
+  
+  /* Stack layout on mobile */
+  #root > div {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto 1fr auto !important;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #000000;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: more) {
+  :root {
+    --neon-green: #00ff00;
+    --neon-red: #ff0000;
+  }
+  
+  .panel::before { display: none; }
+  .panel { border-width: 2px; }
 }

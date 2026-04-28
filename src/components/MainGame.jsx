@@ -72,7 +72,7 @@ export default function MainGame() {
 
     executionRef.current = setTimeout(() => {
       runNextStep(currentBlocks, newBot, newEnemies, allCollected, step + 1)
-    }, 380)
+    }, 320)
   }, [dispatch, levelData])
 
   const handleRun = useCallback(() => {
@@ -108,7 +108,8 @@ export default function MainGame() {
 
   return (
     <div style={{
-      width: '100vw', height: '100vh',
+      width: '100vw',
+      height: '100vh',
       display: 'grid',
       gridTemplateRows: 'auto 1fr auto',
       gridTemplateColumns: '1fr',
@@ -119,25 +120,25 @@ export default function MainGame() {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 320px',
-        gridTemplateRows: '1fr 180px',
+        gridTemplateColumns: 'clamp(300px, 1fr, 100%)',
+        gridTemplateRows: 'clamp(200px, 1fr, 100%) clamp(150px, 200px, 30%)',
         gap: 2,
         padding: '2px',
         height: '100%',
         overflow: 'hidden'
       }}>
         {/* Viewport */}
-        <div style={{ gridRow: '1 / 3', overflow: 'hidden' }}>
+        <div style={{ gridRow: '1 / 3', overflow: 'hidden', minWidth: 0 }}>
           <Viewport />
         </div>
 
         {/* Logic Deck */}
-        <div style={{ overflow: 'hidden' }}>
+        <div style={{ overflow: 'hidden', minWidth: 0 }}>
           <LogicDeck />
         </div>
 
         {/* Console */}
-        <div style={{ overflow: 'hidden' }}>
+        <div style={{ overflow: 'hidden', minWidth: 0 }}>
           <ConsolePanel />
         </div>
       </div>
@@ -145,28 +146,52 @@ export default function MainGame() {
       {/* Game over overlay */}
       {(status === 'won' || status === 'lost') && (
         <div style={{
-          position: 'fixed', inset: 0, background: '#00000099',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000, flexDirection: 'column', gap: 24
-        }}>
+          position: 'fixed',
+          inset: 0,
+          background: '#00000099',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          flexDirection: 'column',
+          gap: 24,
+          backdropFilter: 'blur(2px)'
+        }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="game-over-title">
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 6vw, 72px)',
+            fontFamily: 'var(--font-display)',
+            fontSize: 'clamp(32px, 8vw, 72px)',
             color: status === 'won' ? '#00ff41' : '#ff0040',
             textShadow: `0 0 40px ${status === 'won' ? '#00ff41' : '#ff0040'}`,
             letterSpacing: 8,
-            animation: 'glitch 0.5s infinite'
-          }}>
+            animation: 'glitch 0.5s infinite',
+            textAlign: 'center'
+          }}
+            id="game-over-title">
             {status === 'won' ? '✓ LEVEL COMPLETE' : '✗ SYSTEM FAILURE'}
           </div>
           {status === 'won' && (
-            <div style={{ color: '#ffb000', fontFamily: 'var(--font-mono)', fontSize: 14, letterSpacing: 4 }}>
+            <div style={{
+              color: '#ffb000',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'clamp(12px, 2vw, 16px)',
+              letterSpacing: 4,
+              textAlign: 'center'
+            }}>
               SCORE: {score} pts
             </div>
           )}
-          <div style={{ display: 'flex', gap: 16 }}>
-            <button onClick={handleReset}>RETRY</button>
+          <div style={{
+            display: 'flex',
+            gap: 16,
+            flexWrap: 'wrap',
+            justifyContent: 'center'
+          }}>
+            <button onClick={handleReset} aria-label="Retry level">RETRY</button>
             {status === 'won' && currentLevel < 4 && (
-              <button onClick={handleNext} style={{ borderColor: '#00ff41', color: '#00ff41' }}>NEXT LEVEL</button>
+              <button onClick={handleNext} style={{ borderColor: '#00ff41', color: '#00ff41' }} aria-label="Next level">NEXT LEVEL</button>
             )}
           </div>
         </div>
