@@ -32,6 +32,7 @@ export default function MainGame() {
   const dispatch = useDispatch()
   const { status, bot, enemies, levelData, collectedNodes, currentLevel, score } = useSelector(s => s.game)
   const { blocks } = useSelector(s => s.program)
+  const isMobile = useSelector(s => s.ui.showMobileLayout)
   const executionRef = useRef(null)
   const stepRef = useRef(0)
   const enemyTickRef = useRef(0)
@@ -122,28 +123,11 @@ export default function MainGame() {
     dispatch(clearProgram())
   }, [stopExecution, dispatch])
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    function handleKey(e) {
-      if (e.code === 'Space') {
-        e.preventDefault()
-        if (status !== 'running') handleRun()
-        else handleStop()
-      }
-      if (e.code === 'KeyR' && e.ctrlKey) {
-        e.preventDefault()
-        handleReset()
-      }
-      if (e.code === 'KeyN' && e.ctrlKey) {
-        e.preventDefault()
-        if (currentLevel < 4) handleNext()
-      }
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [status, handleRun, handleStop, handleReset, handleNext, currentLevel])
-
   useEffect(() => () => { if (executionRef.current) clearTimeout(executionRef.current) }, [])
+
+  const gridLayout = isMobile
+    ? { gridTemplateColumns: '1fr', gridTemplateRows: 'auto 1fr 1fr auto' }
+    : { gridTemplateColumns: '1fr 320px', gridTemplateRows: '1fr 180px' }
 
   return (
     <div style={{
@@ -158,20 +142,33 @@ export default function MainGame() {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 320px',
-        gridTemplateRows: '1fr 180px',
+        ...gridLayout,
         gap: 2,
         padding: '2px',
         height: '100%',
         overflow: 'hidden'
       }}>
-        <div style={{ gridRow: '1 / 3', overflow: 'hidden' }}>
+        {/* Viewport */}
+        <div style={{
+          ...(isMobile ? { gridRow: '1', gridColumn: '1' } : { gridRow: '1 / 3', gridColumn: '1' }),
+          overflow: 'hidden'
+        }}>
           <Viewport />
         </div>
-        <div style={{ overflow: 'hidden' }}>
+
+        {/* Logic Deck */}
+        <div style={{
+          ...(isMobile ? { gridRow: '2', gridColumn: '1' } : { gridRow: '1', gridColumn: '2' }),
+          overflow: 'hidden'
+        }}>
           <LogicDeck />
         </div>
-        <div style={{ overflow: 'hidden' }}>
+
+        {/* Console */}
+        <div style={{
+          ...(isMobile ? { gridRow: '3', gridColumn: '1' } : { gridRow: '2', gridColumn: '2' }),
+          overflow: 'hidden'
+        }}>
           <ConsolePanel />
         </div>
       </div>
@@ -188,30 +185,25 @@ export default function MainGame() {
             color: status === 'won' ? '#00ff41' : '#ff0040',
             textShadow: `0 0 40px ${status === 'won' ? '#00ff41' : '#ff0040'}`,
             letterSpacing: 8,
-            animation: 'glitch 0.5s infinite',
-            transform: status === 'won' ? 'scale(1)' : 'scale(1)'
+            animation: 'glitch 0.5s infinite'
           }}>
             {status === 'won' ? '✓ LEVEL COMPLETE' : '✗ SYSTEM FAILURE'}
           </div>
           {status === 'won' && (
-            <>
-              <div style={{ color: '#ffb000', fontFamily: 'var(--font-mono)', fontSize: 14, letterSpacing: 4, animation: 'fadeInUp 0.6s ease' }}>
-                SCORE: {score} pts
-              </div>
-              <Confetti count={50} />
-            </>
+            <div style={{ color: '#ffb000', fontFamily: 'var(--font-mono)', fontSize: 14, letterSpacing: 4 }}>
+              SCORE: {score} pts
+            </div>
           )}
-          <div style={{ display: 'flex', gap: 16, animation: 'fadeInUp 0.7s ease' }}>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
             <button onClick={handleReset}>RETRY</button>
             {status === 'won' && currentLevel < 4 && (
               <button onClick={handleNext} style={{ borderColor: '#00ff41', color: '#00ff41' }}>NEXT LEVEL</button>
             )}
           </div>
-          <div style={{ color: '#003300', fontSize: 10, marginTop: 16, letterSpacing: 2, animation: 'fadeInUp 0.8s ease' }}>
-            {status === 'won' ? 'PRESS [SPACE] OR [N] TO CONTINUE' : 'PRESS [SPACE] OR [R] TO RESTART'}
-          </div>
         </div>
       )}
+
+      {status === 'won' && <Confetti count={60} />}
     </div>
   )
 }

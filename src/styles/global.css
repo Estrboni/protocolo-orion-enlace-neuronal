@@ -46,8 +46,17 @@ body::after {
   z-index: 9999;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; }
+/* CRT vignette */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.3) 100%);
+  pointer-events: none;
+  z-index: 9998;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: #000; }
 ::-webkit-scrollbar-thumb { background: var(--neon-green); border-radius: 2px; }
 
@@ -84,26 +93,38 @@ body::after {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes shimmer {
+  0%, 100% { background-position: -1000px 0; }
+  50% { background-position: 1000px 0; }
+}
+
 @keyframes confetti-fall {
-  0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
-  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  0% { transform: translateY(0) rotate(0); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
 }
 
 @keyframes win-pulse {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
+  50% { transform: scale(1.05); }
 }
 
-@keyframes shimmer {
-  0% { background-position: -1000px 0; }
-  100% { background-position: 1000px 0; }
+@keyframes beam-scan {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
+@keyframes float-up {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-30px); }
+}
+
+/* Text styling */
 .neon-text { text-shadow: 0 0 7px var(--neon-green), 0 0 10px var(--neon-green); }
 .neon-amber { color: var(--neon-amber); text-shadow: 0 0 7px var(--neon-amber); }
 .neon-cyan { color: var(--neon-cyan); text-shadow: 0 0 7px var(--neon-cyan); }
 .neon-red { color: var(--neon-red); text-shadow: 0 0 7px var(--neon-red); }
 
+/* Panels */
 .panel {
   background: var(--bg-panel);
   border: 1px solid var(--border-color);
@@ -136,8 +157,10 @@ body::after {
   content: '▶';
   color: var(--neon-green);
   font-size: 8px;
+  animation: blink 2s infinite;
 }
 
+/* Buttons */
 button {
   font-family: var(--font-mono);
   cursor: pointer;
@@ -151,30 +174,12 @@ button {
   transition: all 0.15s;
   position: relative;
   overflow: hidden;
-  user-select: none;
 }
 
-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-  transition: left 0.5s;
-}
-
-button:hover::before { left: 100%; }
-
-button:hover {
+button:hover:not(:disabled) {
   background: var(--neon-green);
   color: #000;
-  box-shadow: 0 0 15px var(--neon-green);
-}
-
-button:active {
-  transform: scale(0.98);
+  box-shadow: 0 0 15px var(--neon-green), inset 0 0 20px #ffffff22;
 }
 
 button:disabled {
@@ -187,7 +192,7 @@ button.danger {
   color: var(--neon-red);
 }
 
-button.danger:hover {
+button.danger:hover:not(:disabled) {
   background: var(--neon-red);
   color: #000;
   box-shadow: 0 0 15px var(--neon-red);
@@ -198,11 +203,13 @@ button.amber {
   color: var(--neon-amber);
 }
 
-button.amber:hover {
+button.amber:hover:not(:disabled) {
   background: var(--neon-amber);
   color: #000;
+  box-shadow: 0 0 15px var(--neon-amber);
 }
 
+/* Input elements */
 input, select {
   font-family: var(--font-mono);
   background: #000 !important;
@@ -239,14 +246,46 @@ select option {
 .confetti.cyan { background: var(--neon-cyan); box-shadow: 0 0 10px var(--neon-cyan); }
 .confetti.red { background: var(--neon-red); box-shadow: 0 0 10px var(--neon-red); }
 
-/* Responsive */
+/* Tooltips */
+[data-tip] {
+  position: relative;
+}
+
+[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  background: #050f05;
+  border: 1px solid #003300;
+  color: #ffb000;
+  padding: 4px 8px;
+  font-size: 10px;
+  white-space: nowrap;
+  z-index: 1000;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  animation: fadeInUp 0.2s ease;
+}
+
+/* Responsive design */
 @media (max-width: 768px) {
-  button { padding: 4px 12px; font-size: 10px; }
+  :root { font-size: 13px; }
+  button { padding: 4px 12px; font-size: 11px; }
   input, select { font-size: 9px; padding: 3px 6px; }
-  .panel-header { font-size: 8px; }
+  .panel-header { font-size: 8px; padding: 3px 8px; }
 }
 
 @media (max-width: 480px) {
-  button { padding: 3px 8px; font-size: 9px; }
+  :root { font-size: 12px; }
+  button { padding: 3px 8px; font-size: 10px; }
+  input, select { font-size: 8px; padding: 2px 4px; }
+  .panel-header { font-size: 7px; padding: 2px 6px; }
   html, body, #root { font-size: 10px; }
+}
+
+/* Print styles for documentation */
+@media print {
+  body::after, body::before { display: none; }
+  .panel { border: 1px solid black; }
 }
