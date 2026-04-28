@@ -10,6 +10,24 @@ import { executeStep, checkWinCondition, checkNodeCollection } from '../engine/B
 import { moveEnemyToward } from '../engine/AStarEnemy'
 import { clearProgram } from '../store/programSlice'
 
+function Confetti({ count = 40 }) {
+  useEffect(() => {
+    const particles = []
+    for (let i = 0; i < count; i++) {
+      const colors = ['green', 'amber', 'cyan', 'red']
+      const el = document.createElement('div')
+      el.className = `confetti ${colors[Math.floor(Math.random() * colors.length)]}`
+      el.style.left = Math.random() * 100 + '%'
+      el.style.top = '-20px'
+      el.style.setProperty('--duration', (2 + Math.random() * 1.5) + 's')
+      document.body.appendChild(el)
+      particles.push(el)
+    }
+    return () => particles.forEach(p => p.remove())
+  }, [])
+  return null
+}
+
 export default function MainGame() {
   const dispatch = useDispatch()
   const { status, bot, enemies, levelData, collectedNodes, currentLevel, score } = useSelector(s => s.game)
@@ -34,14 +52,6 @@ export default function MainGame() {
 
     const block = currentBlocks[step]
     dispatch(setExecutionStep(step))
-
-    // Validate bot state
-    if (currentBot.energy <= 0) {
-      dispatch(addLog({ type: 'error', msg: `> CRITICAL: ENERGY_DEPLETED at step ${step}` }))
-      dispatch(addLog({ type: 'error', msg: `> STACK TRACE: Energy buffer exhausted. System shutdown.` }))
-      dispatch(setGameOver('lost'))
-      return
-    }
 
     const result = executeStep(block, currentBot, levelData.grid, currentEnemies, levelData.dataNodes, currentCollected)
     result.logs.forEach(l => dispatch(addLog(l)))
@@ -71,17 +81,9 @@ export default function MainGame() {
       return
     }
 
-    // Check wall collision (safety check)
-    if (result.collision) {
-      dispatch(addLog({ type: 'error', msg: `> COLLISION_ERROR: Cannot proceed past wall` }))
-      dispatch(setGameOver('lost'))
-      return
-    }
-
     // Check win
     if (checkWinCondition(newBot, levelData, allCollected)) {
       dispatch(addLog({ type: 'success', msg: `> WIN_CONDITION_MET — all nodes collected, exit reached!` }))
-      dispatch(addLog({ type: 'success', msg: `> LEVEL COMPLETE — Score: +${levelData.dataNodes.length * 50}pts` }))
       dispatch(setGameOver('won'))
       return
     }
@@ -97,7 +99,7 @@ export default function MainGame() {
       return
     }
     dispatch(setStatus('running'))
-    dispatch(addLog({ type: 'system', msg: `> EXECUTING program [${blocks.length} opcodes, ${blocks.reduce((a,b) => a + (b.cost || 8), 0)}KB]` }))
+    dispatch(addLog({ type: 'system', msg: `> EXECUTING program [${blocks.length} opcodes]` }))
     stepRef.current = 0
     enemyTickRef.current = 0
     runNextStep(blocks, bot, enemies, collectedNodes, 0)
@@ -120,6 +122,27 @@ export default function MainGame() {
     dispatch(clearProgram())
   }, [stopExecution, dispatch])
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    function handleKey(e) {
+      if (e.code === 'Space') {
+        e.preventDefault()
+        if (status !== 'running') handleRun()
+        else handleStop()
+      }
+      if (e.code === 'KeyR' && e.ctrlKey) {
+        e.preventDefault()
+        handleReset()
+      }
+      if (e.code === 'KeyN' && e.ctrlKey) {
+        e.preventDefault()
+        if (currentLevel < 4) handleNext()
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [status, handleRun, handleStop, handleReset, handleNext, currentLevel])
+
   useEffect(() => () => { if (executionRef.current) clearTimeout(executionRef.current) }, [])
 
   return (
@@ -135,24 +158,19 @@ export default function MainGame() {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 280px',
-        gridTemplateRows: '1fr 160px',
+        gridTemplateColumns: '1fr 320px',
+        gridTemplateRows: '1fr 180px',
         gap: 2,
         padding: '2px',
         height: '100%',
         overflow: 'hidden'
       }}>
-        {/* Viewport */}
         <div style={{ gridRow: '1 / 3', overflow: 'hidden' }}>
           <Viewport />
         </div>
-
-        {/* Logic Deck */}
         <div style={{ overflow: 'hidden' }}>
           <LogicDeck />
         </div>
-
-        {/* Console */}
         <div style={{ overflow: 'hidden' }}>
           <ConsolePanel />
         </div>
@@ -163,28 +181,34 @@ export default function MainGame() {
         <div style={{
           position: 'fixed', inset: 0, background: '#00000099',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000, flexDirection: 'column', gap: 24,
-          animation: 'fadeInUp 0.4s ease'
+          zIndex: 1000, flexDirection: 'column', gap: 24
         }}>
           <div style={{
             fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 6vw, 72px)',
             color: status === 'won' ? '#00ff41' : '#ff0040',
             textShadow: `0 0 40px ${status === 'won' ? '#00ff41' : '#ff0040'}`,
             letterSpacing: 8,
-            animation: status === 'won' ? 'pulse-green 1.2s ease-in-out' : 'glitch 0.5s infinite'
+            animation: 'glitch 0.5s infinite',
+            transform: status === 'won' ? 'scale(1)' : 'scale(1)'
           }}>
             {status === 'won' ? '✓ LEVEL COMPLETE' : '✗ SYSTEM FAILURE'}
           </div>
           {status === 'won' && (
-            <div style={{ color: '#ffb000', fontFamily: 'var(--font-mono)', fontSize: 14, letterSpacing: 4, animation: 'fadeInUp 0.5s ease 0.2s both' }}>
-              SCORE: {score} pts
-            </div>
+            <>
+              <div style={{ color: '#ffb000', fontFamily: 'var(--font-mono)', fontSize: 14, letterSpacing: 4, animation: 'fadeInUp 0.6s ease' }}>
+                SCORE: {score} pts
+              </div>
+              <Confetti count={50} />
+            </>
           )}
-          <div style={{ display: 'flex', gap: 16, animation: 'fadeInUp 0.5s ease 0.4s both' }}>
+          <div style={{ display: 'flex', gap: 16, animation: 'fadeInUp 0.7s ease' }}>
             <button onClick={handleReset}>RETRY</button>
             {status === 'won' && currentLevel < 4 && (
               <button onClick={handleNext} style={{ borderColor: '#00ff41', color: '#00ff41' }}>NEXT LEVEL</button>
             )}
+          </div>
+          <div style={{ color: '#003300', fontSize: 10, marginTop: 16, letterSpacing: 2, animation: 'fadeInUp 0.8s ease' }}>
+            {status === 'won' ? 'PRESS [SPACE] OR [N] TO CONTINUE' : 'PRESS [SPACE] OR [R] TO RESTART'}
           </div>
         </div>
       )}

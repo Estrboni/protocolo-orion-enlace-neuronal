@@ -20,28 +20,13 @@ export default function Viewport() {
   const canvasRef = useRef(null)
   const { bot, enemies, levelData, collectedNodes, status, executionStep } = useSelector(s => s.game)
   const { blocks } = useSelector(s => s.program)
-  const animRef = useRef({ botX: bot.x, botY: bot.y, tick: 0, particles: [], lastBotPos: { x: bot.x, y: bot.y } })
+  const animRef = useRef({ botX: bot.x, botY: bot.y, tick: 0, particles: [] })
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     let raf
-
-    // Particle system for visual effects
-    function addParticles(x, y, type = 'energy', count = 5) {
-      const colors = { energy: '#00ff41', damage: '#ff0040', success: '#ffb000' }
-      for (let i = 0; i < count; i++) {
-        animRef.current.particles.push({
-          x, y,
-          vx: (Math.random() - 0.5) * 3,
-          vy: (Math.random() - 0.5) * 3 - 1,
-          life: 30,
-          color: colors[type],
-          type
-        })
-      }
-    }
 
     function drawCell(x, y, type, isActive) {
       const px = x * CELL_SIZE
@@ -68,7 +53,7 @@ export default function Viewport() {
         ctx.strokeRect(px + 0.5, py + 0.5, CELL_SIZE - 1, CELL_SIZE - 1)
       }
 
-      // Gate cells — enhanced visuals
+      // Gate cells
       if (type >= 5 && type <= 8) {
         const labels = ['AND', 'OR', 'NOT', 'XOR']
         ctx.fillStyle = color
@@ -80,11 +65,8 @@ export default function Viewport() {
         ctx.textAlign = 'center'
         ctx.fillText(labels[type - 5], px + CELL_SIZE / 2, py + CELL_SIZE / 2 + 3)
         ctx.strokeStyle = color
-        ctx.lineWidth = 1.5
-        ctx.shadowColor = color
-        ctx.shadowBlur = 6
+        ctx.lineWidth = 1
         ctx.strokeRect(px + 1, py + 1, CELL_SIZE - 2, CELL_SIZE - 2)
-        ctx.shadowBlur = 0
       }
     }
 
@@ -136,39 +118,31 @@ export default function Viewport() {
       const px = bx * CELL_SIZE + CELL_SIZE / 2
       const py = by * CELL_SIZE + CELL_SIZE / 2
       const r = CELL_SIZE * 0.32
-
-      // Spawn particles on movement
-      if (bx !== animRef.current.lastBotPos.x || by !== animRef.current.lastBotPos.y) {
-        addParticles(px, py, energy < 30 ? 'damage' : 'energy', 3)
-        animRef.current.lastBotPos = { x: bx, y: by }
-      }
+      const pulse = Math.sin(tick * 0.1) * 1.5 + 1
 
       ctx.save()
-      // Glow — brighter when low energy
-      const glowColor = energy < 20 ? '#ff0040' : '#00ff41'
-      const glowIntensity = energy < 20 ? 20 : 16
-      ctx.shadowColor = glowColor
-      ctx.shadowBlur = glowIntensity
-      ctx.strokeStyle = glowColor
+      // Glow
+      ctx.shadowColor = energy < 20 ? '#ff0040' : '#00ff41'
+      ctx.shadowBlur = 16 * pulse
+      ctx.strokeStyle = energy < 20 ? '#ff0040' : '#00ff41'
       ctx.lineWidth = 2
       ctx.beginPath()
       ctx.arc(px, py, r, 0, Math.PI * 2)
       ctx.stroke()
 
-      // Inner fill
+      // Inner
       ctx.fillStyle = energy < 20 ? '#1a0000' : '#001a00'
       ctx.fill()
 
-      // Direction arrow — smoother
+      // Direction arrow
       const angle = direction * Math.PI / 2 - Math.PI / 2
-      const arrowLen = r - 6
       ctx.beginPath()
-      ctx.moveTo(px + Math.cos(angle) * arrowLen, py + Math.sin(angle) * arrowLen)
-      ctx.lineTo(px + Math.cos(angle + 2.8) * (arrowLen - 10), py + Math.sin(angle + 2.8) * (arrowLen - 10))
-      ctx.lineTo(px + Math.cos(angle - 2.8) * (arrowLen - 10), py + Math.sin(angle - 2.8) * (arrowLen - 10))
+      ctx.moveTo(px + Math.cos(angle) * (r - 4), py + Math.sin(angle) * (r - 4))
+      ctx.lineTo(px + Math.cos(angle + 2.5) * (r - 10), py + Math.sin(angle + 2.5) * (r - 10))
+      ctx.lineTo(px + Math.cos(angle - 2.5) * (r - 10), py + Math.sin(angle - 2.5) * (r - 10))
       ctx.closePath()
-      ctx.fillStyle = glowColor
-      ctx.shadowBlur = 6
+      ctx.fillStyle = energy < 20 ? '#ff0040' : '#00ff41'
+      ctx.shadowBlur = 8 * pulse
       ctx.fill()
 
       // Center dot
@@ -176,16 +150,6 @@ export default function Viewport() {
       ctx.beginPath()
       ctx.arc(px, py, 3, 0, Math.PI * 2)
       ctx.fill()
-
-      // Pulse ring when damaged
-      if (energy < 30) {
-        const pulseRing = Math.sin(tick * 0.3) * 5 + 3
-        ctx.strokeStyle = '#ff004044'
-        ctx.lineWidth = 1
-        ctx.beginPath()
-        ctx.arc(px, py, r + pulseRing, 0, Math.PI * 2)
-        ctx.stroke()
-      }
 
       ctx.restore()
     }
@@ -218,24 +182,6 @@ export default function Viewport() {
       ctx.fillText('✕', px, py + 4)
       ctx.globalAlpha = 1
       ctx.restore()
-    }
-
-    function drawParticles(tick) {
-      animRef.current.particles = animRef.current.particles.filter(p => p.life > 0)
-      animRef.current.particles.forEach(p => {
-        p.x += p.vx
-        p.y += p.vy
-        p.vy += 0.15 // gravity
-        p.life--
-
-        const alpha = p.life / 30
-        ctx.globalAlpha = alpha * 0.8
-        ctx.fillStyle = p.color
-        ctx.font = '8px monospace'
-        ctx.textAlign = 'center'
-        ctx.fillText('+', p.x, p.y)
-      })
-      ctx.globalAlpha = 1
     }
 
     function render() {
@@ -281,14 +227,13 @@ export default function Viewport() {
       // Draw bot
       drawBot(bot.x, bot.y, bot.direction, bot.energy, tick)
 
-      // Draw particles
-      drawParticles(tick)
-
       // Execution highlight
       if (status === 'running') {
-        ctx.strokeStyle = '#00ff4133'
-        ctx.lineWidth = 2
+        ctx.strokeStyle = '#00ff4144'
+        ctx.lineWidth = 2.5
         ctx.setLineDash([4, 4])
+        ctx.shadowColor = '#00ff41'
+        ctx.shadowBlur = 6
         ctx.strokeRect(bot.x * CELL_SIZE + 1, bot.y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2)
         ctx.setLineDash([])
       }
@@ -303,9 +248,9 @@ export default function Viewport() {
   }, [bot, enemies, levelData, collectedNodes, status])
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div style={{ width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
       <div className="panel-header" style={{ fontSize: 9 }}>VIEWPORT — SECTOR MAP</div>
-      <canvas ref={canvasRef} style={{ width: '100%', height: 'calc(100% - 22px)', display: 'block', background: '#000' }} />
+      <canvas ref={canvasRef} style={{ flex: 1, display: 'block', background: '#000', width: '100%', height: '100%' }} />
     </div>
   )
 }
