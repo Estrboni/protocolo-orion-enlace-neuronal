@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import { CELL } from '../levels/levelData'
 
@@ -19,27 +19,29 @@ function lerp(a, b, t) { return a + (b - a) * t }
 export default function Viewport() {
   const canvasRef = useRef(null)
   const { bot, enemies, levelData, collectedNodes, status, executionStep } = useSelector(s => s.game)
-  const animRef = useRef({ botPos: { x: bot.x, y: bot.y }, enemyPos: enemies.map(e => ({ x: e.x, y: e.y })), tick: 0, transitionT: 0 })
-  const [canvasSize, setCanvasSize] = useState({ w: 800, h: 600 })
-  const resizeRef = useRef(null)
-
-  // Handle canvas resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (canvasRef.current) {
-        setCanvasSize({ w: canvasRef.current.offsetWidth, h: canvasRef.current.offsetHeight })
-      }
-    }
-    handleResize()
-    resizeRef.current = setInterval(handleResize, 500)
-    return () => clearInterval(resizeRef.current)
-  }, [])
+  const { blocks } = useSelector(s => s.program)
+  const animRef = useRef({ botX: bot.x, botY: bot.y, tick: 0, particles: [], lastBotPos: { x: bot.x, y: bot.y } })
 
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || !levelData) return
+    if (!canvas) return
     const ctx = canvas.getContext('2d')
     let raf
+
+    // Particle system for visual effects
+    function addParticles(x, y, type = 'energy', count = 5) {
+      const colors = { energy: '#00ff41', damage: '#ff0040', success: '#ffb000' }
+      for (let i = 0; i < count; i++) {
+        animRef.current.particles.push({
+          x, y,
+          vx: (Math.random() - 0.5) * 3,
+          vy: (Math.random() - 0.5) * 3 - 1,
+          life: 30,
+          color: colors[type],
+          type
+        })
+      }
+    }
 
     function drawCell(x, y, type, isActive) {
       const px = x * CELL_SIZE
@@ -66,7 +68,7 @@ export default function Viewport() {
         ctx.strokeRect(px + 0.5, py + 0.5, CELL_SIZE - 1, CELL_SIZE - 1)
       }
 
-      // Gate cells with better visuals
+      // Gate cells — enhanced visuals
       if (type >= 5 && type <= 8) {
         const labels = ['AND', 'OR', 'NOT', 'XOR']
         ctx.fillStyle = color
@@ -77,10 +79,10 @@ export default function Viewport() {
         ctx.font = `bold 8px monospace`
         ctx.textAlign = 'center'
         ctx.fillText(labels[type - 5], px + CELL_SIZE / 2, py + CELL_SIZE / 2 + 3)
-        ctx.shadowColor = color
-        ctx.shadowBlur = 6
         ctx.strokeStyle = color
         ctx.lineWidth = 1.5
+        ctx.shadowColor = color
+        ctx.shadowBlur = 6
         ctx.strokeRect(px + 1, py + 1, CELL_SIZE - 2, CELL_SIZE - 2)
         ctx.shadowBlur = 0
       }
@@ -90,143 +92,164 @@ export default function Viewport() {
       if (collected) return
       const px = n.x * CELL_SIZE + CELL_SIZE / 2
       const py = n.y * CELL_SIZE + CELL_SIZE / 2
-      const pulse = Math.sin(tick * 0.08 + n.id) * 4 + 8
+      const pulse = Math.sin(tick * 0.08 + n.id) * 3 + 6
 
       ctx.save()
       ctx.shadowColor = '#00ff41'
       ctx.shadowBlur = 12 + pulse
       ctx.strokeStyle = '#00ff41'
-      ctx.lineWidth = 2
+      ctx.lineWidth = 1.5
       ctx.beginPath()
       ctx.arc(px, py, pulse, 0, Math.PI * 2)
       ctx.stroke()
 
       ctx.fillStyle = '#00ff41'
-      ctx.font = 'bold 10px monospace'
+      ctx.font = '8px monospace'
       ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText('◆', px, py)
+      ctx.fillText('◆', px, py + 3)
       ctx.restore()
     }
 
     function drawExit(exit, tick) {
       const px = exit.x * CELL_SIZE
       const py = exit.y * CELL_SIZE
-      const pulse = Math.sin(tick * 0.05) * 0.4 + 0.6
+      const pulse = Math.sin(tick * 0.05) * 0.3 + 0.7
 
       ctx.save()
       ctx.globalAlpha = pulse
       ctx.fillStyle = '#ffb00022'
       ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE)
       ctx.strokeStyle = '#ffb000'
-      ctx.lineWidth = 2.5
+      ctx.lineWidth = 2
       ctx.shadowColor = '#ffb000'
-      ctx.shadowBlur = 12
+      ctx.shadowBlur = 10
       ctx.strokeRect(px + 2, py + 2, CELL_SIZE - 4, CELL_SIZE - 4)
       ctx.globalAlpha = 1
       ctx.fillStyle = '#ffb000'
-      ctx.font = 'bold 18px monospace'
+      ctx.font = '16px monospace'
       ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText('⬡', px + CELL_SIZE / 2, py + CELL_SIZE / 2)
+      ctx.fillText('⬡', px + CELL_SIZE / 2, py + CELL_SIZE / 2 + 6)
       ctx.restore()
     }
 
     function drawBot(bx, by, direction, energy, tick) {
       const px = bx * CELL_SIZE + CELL_SIZE / 2
       const py = by * CELL_SIZE + CELL_SIZE / 2
-      const r = CELL_SIZE * 0.35
+      const r = CELL_SIZE * 0.32
+
+      // Spawn particles on movement
+      if (bx !== animRef.current.lastBotPos.x || by !== animRef.current.lastBotPos.y) {
+        addParticles(px, py, energy < 30 ? 'damage' : 'energy', 3)
+        animRef.current.lastBotPos = { x: bx, y: by }
+      }
 
       ctx.save()
-      // Energy-based glow
-      const glowColor = energy < 20 ? '#ff0040' : energy < 50 ? '#ffb000' : '#00ff41'
+      // Glow — brighter when low energy
+      const glowColor = energy < 20 ? '#ff0040' : '#00ff41'
+      const glowIntensity = energy < 20 ? 20 : 16
       ctx.shadowColor = glowColor
-      ctx.shadowBlur = 18 + Math.sin(tick * 0.1) * 6
+      ctx.shadowBlur = glowIntensity
       ctx.strokeStyle = glowColor
-      ctx.lineWidth = 2.5
+      ctx.lineWidth = 2
       ctx.beginPath()
       ctx.arc(px, py, r, 0, Math.PI * 2)
       ctx.stroke()
 
-      // Inner circle
+      // Inner fill
       ctx.fillStyle = energy < 20 ? '#1a0000' : '#001a00'
       ctx.fill()
 
-      // Direction arrow with smooth rotation
-      const angle = direction * Math.PI / 2 - Math.PI / 2 + Math.sin(tick * 0.05) * 0.1
+      // Direction arrow — smoother
+      const angle = direction * Math.PI / 2 - Math.PI / 2
+      const arrowLen = r - 6
       ctx.beginPath()
-      ctx.moveTo(px + Math.cos(angle) * (r - 6), py + Math.sin(angle) * (r - 6))
-      ctx.lineTo(px + Math.cos(angle + 2.6) * (r - 12), py + Math.sin(angle + 2.6) * (r - 12))
-      ctx.lineTo(px + Math.cos(angle - 2.6) * (r - 12), py + Math.sin(angle - 2.6) * (r - 12))
+      ctx.moveTo(px + Math.cos(angle) * arrowLen, py + Math.sin(angle) * arrowLen)
+      ctx.lineTo(px + Math.cos(angle + 2.8) * (arrowLen - 10), py + Math.sin(angle + 2.8) * (arrowLen - 10))
+      ctx.lineTo(px + Math.cos(angle - 2.8) * (arrowLen - 10), py + Math.sin(angle - 2.8) * (arrowLen - 10))
       ctx.closePath()
       ctx.fillStyle = glowColor
+      ctx.shadowBlur = 6
       ctx.fill()
 
       // Center dot
       ctx.fillStyle = '#000'
       ctx.beginPath()
-      ctx.arc(px, py, 4, 0, Math.PI * 2)
+      ctx.arc(px, py, 3, 0, Math.PI * 2)
       ctx.fill()
 
-      // Energy bar below
-      const barW = r * 1.8, barH = 4
-      ctx.fillStyle = '#001a00'
-      ctx.fillRect(px - barW / 2, py + r + 8, barW, barH)
-      ctx.fillStyle = energy < 20 ? '#ff0040' : energy < 50 ? '#ffb000' : '#00ff41'
-      ctx.fillRect(px - barW / 2, py + r + 8, (barW * energy) / 100, barH)
-      ctx.strokeStyle = glowColor
-      ctx.lineWidth = 1
-      ctx.strokeRect(px - barW / 2, py + r + 8, barW, barH)
+      // Pulse ring when damaged
+      if (energy < 30) {
+        const pulseRing = Math.sin(tick * 0.3) * 5 + 3
+        ctx.strokeStyle = '#ff004044'
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.arc(px, py, r + pulseRing, 0, Math.PI * 2)
+        ctx.stroke()
+      }
 
       ctx.restore()
     }
 
-    function drawEnemy(e, tick, isActive) {
+    function drawEnemy(e, tick) {
       const px = e.x * CELL_SIZE + CELL_SIZE / 2
       const py = e.y * CELL_SIZE + CELL_SIZE / 2
-      const r = CELL_SIZE * 0.3
-      const flicker = Math.sin(tick * 0.15 + e.id * 1.3) * 0.25 + 0.75
+      const r = CELL_SIZE * 0.28
+      const flicker = Math.sin(tick * 0.15 + e.id * 1.3) * 0.3 + 0.7
 
       ctx.save()
       ctx.globalAlpha = flicker
       ctx.shadowColor = '#ff0040'
-      ctx.shadowBlur = isActive ? 20 : 14
+      ctx.shadowBlur = 14
       ctx.strokeStyle = '#ff0040'
-      ctx.lineWidth = isActive ? 2.5 : 2
-      // Diamond with rotation
-      const rot = tick * 0.02 + e.id
-      ctx.translate(px, py)
-      ctx.rotate(rot)
+      ctx.lineWidth = 1.5
+      // Diamond shape
       ctx.beginPath()
-      ctx.moveTo(0, -r)
-      ctx.lineTo(r, 0)
-      ctx.lineTo(0, r)
-      ctx.lineTo(-r, 0)
+      ctx.moveTo(px, py - r)
+      ctx.lineTo(px + r, py)
+      ctx.lineTo(px, py + r)
+      ctx.lineTo(px - r, py)
       ctx.closePath()
       ctx.stroke()
       ctx.fillStyle = '#1a0000'
       ctx.fill()
-      ctx.rotate(-rot)
-      ctx.translate(-px, -py)
       ctx.fillStyle = '#ff0040'
-      ctx.font = 'bold 10px monospace'
+      ctx.font = '10px monospace'
       ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText('✕', px, py + 1)
+      ctx.fillText('✕', px, py + 4)
       ctx.globalAlpha = 1
       ctx.restore()
+    }
+
+    function drawParticles(tick) {
+      animRef.current.particles = animRef.current.particles.filter(p => p.life > 0)
+      animRef.current.particles.forEach(p => {
+        p.x += p.vx
+        p.y += p.vy
+        p.vy += 0.15 // gravity
+        p.life--
+
+        const alpha = p.life / 30
+        ctx.globalAlpha = alpha * 0.8
+        ctx.fillStyle = p.color
+        ctx.font = '8px monospace'
+        ctx.textAlign = 'center'
+        ctx.fillText('+', p.x, p.y)
+      })
+      ctx.globalAlpha = 1
     }
 
     function render() {
       animRef.current.tick++
       const tick = animRef.current.tick
 
+      if (!levelData) return
+
       const grid = levelData.grid
       const gridW = grid[0].length * CELL_SIZE
       const gridH = grid.length * CELL_SIZE
 
-      canvas.width = canvasSize.w
-      canvas.height = canvasSize.h
+      canvas.width = canvas.offsetWidth
+      canvas.height = canvas.offsetHeight
 
       // Center the grid
       const offsetX = Math.max(0, (canvas.width - gridW) / 2)
@@ -252,22 +275,21 @@ export default function Viewport() {
       // Draw data nodes
       levelData.dataNodes.forEach(n => drawDataNode(n, collectedNodes.includes(n.id), tick))
 
-      // Draw enemies with activity highlight
-      enemies.forEach((e, i) => {
-        const isActive = status === 'running'
-        drawEnemy(e, tick, isActive)
-      })
+      // Draw enemies
+      enemies.forEach(e => drawEnemy(e, tick))
 
       // Draw bot
       drawBot(bot.x, bot.y, bot.direction, bot.energy, tick)
 
-      // Execution highlight with pulsing border
+      // Draw particles
+      drawParticles(tick)
+
+      // Execution highlight
       if (status === 'running') {
-        const pulse = Math.sin(tick * 0.08) * 2 + 2
-        ctx.strokeStyle = `#00ff41${Math.floor((0.5 + Math.sin(tick * 0.08) * 0.3) * 255).toString(16)}`
-        ctx.lineWidth = pulse
-        ctx.setLineDash([3, 3])
-        ctx.strokeRect(bot.x * CELL_SIZE + pulse/2, bot.y * CELL_SIZE + pulse/2, CELL_SIZE - pulse, CELL_SIZE - pulse)
+        ctx.strokeStyle = '#00ff4133'
+        ctx.lineWidth = 2
+        ctx.setLineDash([4, 4])
+        ctx.strokeRect(bot.x * CELL_SIZE + 1, bot.y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2)
         ctx.setLineDash([])
       }
 
@@ -278,7 +300,7 @@ export default function Viewport() {
 
     render()
     return () => cancelAnimationFrame(raf)
-  }, [bot, enemies, levelData, collectedNodes, status, canvasSize])
+  }, [bot, enemies, levelData, collectedNodes, status])
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
