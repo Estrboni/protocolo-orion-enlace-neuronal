@@ -10,29 +10,10 @@ import { executeStep, checkWinCondition, checkNodeCollection } from '../engine/B
 import { moveEnemyToward } from '../engine/AStarEnemy'
 import { clearProgram } from '../store/programSlice'
 
-function Confetti({ count = 40 }) {
-  useEffect(() => {
-    const particles = []
-    for (let i = 0; i < count; i++) {
-      const colors = ['green', 'amber', 'cyan', 'red']
-      const el = document.createElement('div')
-      el.className = `confetti ${colors[Math.floor(Math.random() * colors.length)]}`
-      el.style.left = Math.random() * 100 + '%'
-      el.style.top = '-20px'
-      el.style.setProperty('--duration', (2 + Math.random() * 1.5) + 's')
-      document.body.appendChild(el)
-      particles.push(el)
-    }
-    return () => particles.forEach(p => p.remove())
-  }, [])
-  return null
-}
-
 export default function MainGame() {
   const dispatch = useDispatch()
   const { status, bot, enemies, levelData, collectedNodes, currentLevel, score } = useSelector(s => s.game)
   const { blocks } = useSelector(s => s.program)
-  const isMobile = useSelector(s => s.ui.showMobileLayout)
   const executionRef = useRef(null)
   const stepRef = useRef(0)
   const enemyTickRef = useRef(0)
@@ -60,12 +41,10 @@ export default function MainGame() {
     const newBot = result.bot
     dispatch(updateBot(newBot))
 
-    // Check node collection
     const newlyCollected = checkNodeCollection(newBot, levelData.dataNodes, currentCollected)
     newlyCollected.forEach(id => dispatch(collectNode(id)))
     const allCollected = [...currentCollected, ...newlyCollected]
 
-    // Move enemies every 2 steps
     enemyTickRef.current += 1
     let newEnemies = currentEnemies
     if (enemyTickRef.current % 2 === 0) {
@@ -73,7 +52,6 @@ export default function MainGame() {
       dispatch(updateEnemies(newEnemies))
     }
 
-    // Check enemy collision
     const caught = newEnemies.some(e => e.x === newBot.x && e.y === newBot.y)
     if (caught) {
       dispatch(addLog({ type: 'error', msg: `> FATAL: ENEMY_COLLISION — bot destroyed at [${newBot.x},${newBot.y}]` }))
@@ -82,7 +60,6 @@ export default function MainGame() {
       return
     }
 
-    // Check win
     if (checkWinCondition(newBot, levelData, allCollected)) {
       dispatch(addLog({ type: 'success', msg: `> WIN_CONDITION_MET — all nodes collected, exit reached!` }))
       dispatch(setGameOver('won'))
@@ -123,11 +100,19 @@ export default function MainGame() {
     dispatch(clearProgram())
   }, [stopExecution, dispatch])
 
-  useEffect(() => () => { if (executionRef.current) clearTimeout(executionRef.current) }, [])
+  // Keyboard shortcuts: Space=Run, X=Stop, R=Reset, N=Next
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.code === 'Space') { e.preventDefault(); handleRun() }
+      if (e.code === 'KeyX') { handleStop() }
+      if (e.code === 'KeyR' && e.ctrlKey) { e.preventDefault(); handleReset() }
+      if (e.code === 'KeyN' && e.ctrlKey) { e.preventDefault(); handleNext() }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleRun, handleStop, handleReset, handleNext])
 
-  const gridLayout = isMobile
-    ? { gridTemplateColumns: '1fr', gridTemplateRows: 'auto 1fr 1fr auto' }
-    : { gridTemplateColumns: '1fr 320px', gridTemplateRows: '1fr 180px' }
+  useEffect(() => () => { if (executionRef.current) clearTimeout(executionRef.current) }, [])
 
   return (
     <div style={{
@@ -142,33 +127,29 @@ export default function MainGame() {
 
       <div style={{
         display: 'grid',
-        ...gridLayout,
+        gridTemplateColumns: 'clamp(240px, 1fr, 400px) 1fr',
+        gridTemplateRows: '1fr auto',
         gap: 2,
         padding: '2px',
         height: '100%',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        '@media (max-width: 768px)': {
+          gridTemplateColumns: '1fr',
+          gridTemplateRows: '1fr auto auto'
+        }
       }}>
         {/* Viewport */}
-        <div style={{
-          ...(isMobile ? { gridRow: '1', gridColumn: '1' } : { gridRow: '1 / 3', gridColumn: '1' }),
-          overflow: 'hidden'
-        }}>
+        <div style={{ gridColumn: '2', gridRow: '1 / 3', overflow: 'hidden', '@media (max-width: 768px)': { gridColumn: '1', gridRow: '1' } }}>
           <Viewport />
         </div>
 
         {/* Logic Deck */}
-        <div style={{
-          ...(isMobile ? { gridRow: '2', gridColumn: '1' } : { gridRow: '1', gridColumn: '2' }),
-          overflow: 'hidden'
-        }}>
+        <div style={{ overflow: 'hidden', '@media (max-width: 768px)': { gridColumn: '1', gridRow: '2' } }}>
           <LogicDeck />
         </div>
 
         {/* Console */}
-        <div style={{
-          ...(isMobile ? { gridRow: '3', gridColumn: '1' } : { gridRow: '2', gridColumn: '2' }),
-          overflow: 'hidden'
-        }}>
+        <div style={{ overflow: 'hidden', '@media (max-width: 768px)': { gridColumn: '1', gridRow: '3' } }}>
           <ConsolePanel />
         </div>
       </div>
@@ -181,7 +162,7 @@ export default function MainGame() {
           zIndex: 1000, flexDirection: 'column', gap: 24
         }}>
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 6vw, 72px)',
+            fontFamily: 'var(--font-display)', fontSize: 'clamp(24px, 6vw, 72px)',
             color: status === 'won' ? '#00ff41' : '#ff0040',
             textShadow: `0 0 40px ${status === 'won' ? '#00ff41' : '#ff0040'}`,
             letterSpacing: 8,
@@ -195,15 +176,13 @@ export default function MainGame() {
             </div>
           )}
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button onClick={handleReset}>RETRY</button>
+            <button onClick={handleReset} title="Reset level (Ctrl+R)">RETRY</button>
             {status === 'won' && currentLevel < 4 && (
-              <button onClick={handleNext} style={{ borderColor: '#00ff41', color: '#00ff41' }}>NEXT LEVEL</button>
+              <button onClick={handleNext} title="Next level (Ctrl+N)" style={{ borderColor: '#00ff41', color: '#00ff41' }}>NEXT LEVEL</button>
             )}
           </div>
         </div>
       )}
-
-      {status === 'won' && <Confetti count={60} />}
     </div>
   )
 }
