@@ -17,16 +17,14 @@ export default function MainGame() {
   const executionRef = useRef(null)
   const stepRef = useRef(0)
   const enemyTickRef = useRef(0)
-  const shakeRef = useRef(null)
   const containerRef = useRef(null)
 
   const triggerShake = useCallback(() => {
-    if (shakeRef.current) clearTimeout(shakeRef.current)
     if (containerRef.current) {
-      containerRef.current.style.animation = 'wallHitShake 0.3s'
-      shakeRef.current = setTimeout(() => {
+      containerRef.current.style.animation = 'wallHitShake 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
+      setTimeout(() => {
         if (containerRef.current) containerRef.current.style.animation = ''
-      }, 300)
+      }, 400)
     }
   }, [])
 
@@ -53,15 +51,20 @@ export default function MainGame() {
     const newBot = result.bot
     dispatch(updateBot(newBot))
 
-    // Wall hit feedback
-    if (result.collision && result.hitType === 'wall') {
+    // Wall collision
+    if (result.collision) {
       triggerShake()
+      dispatch(addLog({ type: 'error', msg: `> EXECUTION_FAILED at step ${step}` }))
+      dispatch(setStatus('idle'))
+      return
     }
 
+    // Check node collection
     const newlyCollected = checkNodeCollection(newBot, levelData.dataNodes, currentCollected)
     newlyCollected.forEach(id => dispatch(collectNode(id)))
     const allCollected = [...currentCollected, ...newlyCollected]
 
+    // Move enemies every 2 steps with smooth pathfinding
     enemyTickRef.current += 1
     let newEnemies = currentEnemies
     if (enemyTickRef.current % 2 === 0) {
@@ -69,33 +72,48 @@ export default function MainGame() {
       dispatch(updateEnemies(newEnemies))
     }
 
+    // Check enemy collision
     const caught = newEnemies.some(e => e.x === newBot.x && e.y === newBot.y)
     if (caught) {
-      dispatch(addLog({ type: 'error', msg: `> FATAL: ENEMY_COLLISION — bot destroyed at [${newBot.x},${newBot.y}]` }))
-      dispatch(addLog({ type: 'error', msg: `> STACK TRACE: Entity contact at step ${step}. No evasion logic found.` }))
       triggerShake()
+      dispatch(addLog({ type: 'error', msg: `> FATAL: ENEMY_COLLISION at [${newBot.x},${newBot.y}]` }))
+      dispatch(addLog({ type: 'error', msg: `> STACK TRACE: No evasion logic at step ${step}. Systems critical.` }))
       dispatch(setGameOver('lost'))
       return
     }
 
+    // Check low energy warning
+    if (newBot.energy < 20 && newBot.energy > 0) {
+      dispatch(addLog({ type: 'warn', msg: `> WARNING: Low power — ${Math.ceil(newBot.energy)}% remaining` }))
+    }
+
+    // Check out of energy
+    if (newBot.energy <= 0) {
+      dispatch(addLog({ type: 'error', msg: `> POWER_FAILURE — bot shutdown` }))
+      dispatch(setStatus('idle'))
+      return
+    }
+
+    // Check win
     if (checkWinCondition(newBot, levelData, allCollected)) {
-      dispatch(addLog({ type: 'success', msg: `> WIN_CONDITION_MET — all nodes collected, exit reached!` }))
+      dispatch(addLog({ type: 'success', msg: `> WIN_CONDITION_MET — all nodes collected!` }))
+      dispatch(addLog({ type: 'success', msg: `> NEURAL_PROTOCOL_COMPLETE — advancing neural matrix` }))
       dispatch(setGameOver('won'))
       return
     }
 
     executionRef.current = setTimeout(() => {
       runNextStep(currentBlocks, newBot, newEnemies, allCollected, step + 1)
-    }, 380)
+    }, 400)
   }, [dispatch, levelData, triggerShake])
 
   const handleRun = useCallback(() => {
     if (blocks.length === 0) {
-      dispatch(addLog({ type: 'error', msg: '> ERROR: No program loaded. Add blocks to Logic Deck.' }))
+      dispatch(addLog({ type: 'error', msg: '> ERROR: Program buffer empty. Load opcodes into Logic Deck.' }))
       return
     }
     dispatch(setStatus('running'))
-    dispatch(addLog({ type: 'system', msg: `> EXECUTING program [${blocks.length} opcodes]` }))
+    dispatch(addLog({ type: 'system', msg: `> EXECUTING ${blocks.length} opcodes...` }))
     stepRef.current = 0
     enemyTickRef.current = 0
     runNextStep(blocks, bot, enemies, collectedNodes, 0)
@@ -127,8 +145,7 @@ export default function MainGame() {
       gridTemplateRows: 'auto 1fr auto',
       gridTemplateColumns: '1fr',
       background: '#000',
-      overflow: 'hidden',
-      transition: 'all 0.05s'
+      overflow: 'hidden'
     }}>
       <HUD onRun={handleRun} onStop={handleStop} onReset={handleReset} onNext={handleNext} />
 
@@ -141,44 +158,47 @@ export default function MainGame() {
         height: '100%',
         overflow: 'hidden'
       }}>
+        {/* Viewport */}
         <div style={{ gridRow: '1 / 3', overflow: 'hidden' }}>
           <Viewport />
         </div>
 
+        {/* Logic Deck */}
         <div style={{ overflow: 'hidden' }}>
           <LogicDeck />
         </div>
 
+        {/* Console */}
         <div style={{ overflow: 'hidden' }}>
           <ConsolePanel />
         </div>
       </div>
 
+      {/* Game over overlay */}
       {(status === 'won' || status === 'lost') && (
         <div style={{
           position: 'fixed', inset: 0, background: '#00000099',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000, flexDirection: 'column', gap: 24,
-          animation: 'popIn 0.5s ease'
+          zIndex: 1000, flexDirection: 'column', gap: 24
         }}>
           <div style={{
             fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 6vw, 72px)',
             color: status === 'won' ? '#00ff41' : '#ff0040',
             textShadow: `0 0 40px ${status === 'won' ? '#00ff41' : '#ff0040'}`,
             letterSpacing: 8,
-            animation: 'glitch 0.5s infinite'
+            animation: status === 'won' ? 'glitch 0.3s, glitchColor 2s infinite' : 'glitch 0.2s infinite'
           }}>
-            {status === 'won' ? '✓ LEVEL COMPLETE' : '✗ SYSTEM FAILURE'}
+            {status === 'won' ? '✓ PROTOCOL COMPLETE' : '✗ NEURAL FAILURE'}
           </div>
           {status === 'won' && (
-            <div style={{ color: '#ffb000', fontFamily: 'var(--font-mono)', fontSize: 14, letterSpacing: 4 }}>
-              SCORE: {score} pts
+            <div style={{ color: '#ffb000', fontFamily: 'var(--font-mono)', fontSize: 14, letterSpacing: 4, animation: 'fadeInUp 0.5s ease' }}>
+              SCORE: {score} pts • NODE_INDEX_COMPLETE
             </div>
           )}
           <div style={{ display: 'flex', gap: 16 }}>
-            <button onClick={handleReset}>RETRY</button>
+            <button onClick={handleReset}>↺ RETRY</button>
             {status === 'won' && currentLevel < 4 && (
-              <button onClick={handleNext} style={{ borderColor: '#00ff41', color: '#00ff41' }}>NEXT LEVEL</button>
+              <button onClick={handleNext} style={{ borderColor: '#00ff41', color: '#00ff41' }}>→ NEXT_LEVEL</button>
             )}
           </div>
         </div>

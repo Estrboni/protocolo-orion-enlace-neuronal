@@ -1,11 +1,9 @@
 import React from 'react'
-import { useSelector, useDispatch } from 'react-redux'
-import { pauseExecution, resumeExecution } from '../store/gameSlice'
+import { useSelector } from 'react-redux'
 import { BLOCK_COSTS_MAP } from '../store/programSlice'
 import { LEVELS } from '../levels/levelData'
 
 export default function HUD({ onRun, onStop, onReset, onNext }) {
-  const dispatch = useDispatch()
   const { status, bot, currentLevel, levelData, collectedNodes, score } = useSelector(s => s.game)
   const { blocks } = useSelector(s => s.program)
 
@@ -21,84 +19,141 @@ export default function HUD({ onRun, onStop, onReset, onNext }) {
   const nodesCollected = collectedNodes.length
 
   const dirNames = ['▲ N', '▶ E', '▼ S', '◀ W']
-  const isOverflow = memoryUsed > memoryTotal
 
   return (
     <div style={{
       background: '#050f05',
       borderBottom: '1px solid #003300',
-      padding: 'clamp(4px, 1vw, 8px)',
+      padding: '6px 12px',
       display: 'flex',
-      flexWrap: 'wrap',
       alignItems: 'center',
-      gap: 'clamp(8px, 2vw, 16px)',
+      gap: 16,
+      flexWrap: 'wrap',
       fontFamily: 'var(--font-mono)',
-      fontSize: 'clamp(8px, 1.5vw, 11px)',
-      minHeight: 'auto'
+      fontSize: 10,
+      minHeight: 40
     }}>
       {/* Title */}
-      <div style={{ color: '#00ff41', fontFamily: 'var(--font-display)', fontSize: 'clamp(14px, 2vw, 20px)', letterSpacing: 4, textShadow: '0 0 10px #00ff41' }}>
+      <div style={{
+        color: '#00ff41',
+        fontFamily: 'var(--font-display)',
+        fontSize: 18,
+        letterSpacing: 4,
+        textShadow: '0 0 10px #00ff41',
+        marginRight: 8,
+        userSelect: 'none'
+      }}>
         ORIÓN
       </div>
 
-      {/* Level — hide on very small screens */}
-      <div style={{ color: '#006622', letterSpacing: 2, display: window.innerWidth < 600 ? 'none' : 'block' }}>
+      {/* Level */}
+      <div style={{ color: '#006622', letterSpacing: 2, userSelect: 'none' }}>
         LVL <span style={{ color: '#ffb000' }}>{String(currentLevel + 1).padStart(2, '0')}</span>
-        <span style={{ color: '#004400' }}> — </span>
-        <span style={{ color: '#00ff41' }}>{levelData?.name}</span>
+        {' '}<span style={{ color: '#004400' }}>—</span>{' '}
+        <span style={{ color: '#00ff41', textShadow: '0 0 5px #00ff41' }}>{levelData?.name}</span>
       </div>
 
+      <div style={{ width: 1, height: 20, background: '#003300' }} />
+
       {/* Memory */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#006622' }}>MEM</span>
-        <div style={{ width: 60, height: 6, background: '#001100', border: '1px solid #003300', borderRadius: 2 }}>
-          <div style={{ width: `${memPct}%`, height: '100%', background: memColor, transition: 'all 0.3s', boxShadow: `0 0 6px ${memColor}` }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 140 }}>
+        <span style={{ color: '#006622', minWidth: 32 }}>MEM</span>
+        <div style={{
+          width: 80, height: 8, background: '#001100', border: '1px solid #003300', borderRadius: 2,
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            width: `${memPct}%`, height: '100%', background: memColor,
+            transition: 'all 0.2s', boxShadow: `inset 0 0 4px ${memColor}`
+          }} />
         </div>
-        <span style={{ color: memColor, fontSize: 'clamp(7px, 1.2vw, 10px)' }}>{memoryUsed}KB</span>
+        <span style={{ color: memColor, minWidth: 55, fontSize: 9 }}>{memoryUsed}/{memoryTotal}KB</span>
       </div>
 
       {/* Energy */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#006622' }}>PWR</span>
-        <div style={{ width: 50, height: 6, background: '#001100', border: '1px solid #003300', borderRadius: 2 }}>
-          <div style={{ width: `${energyPct}%`, height: '100%', background: energyColor, transition: 'all 0.3s' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 120 }}>
+        <span style={{ color: '#006622', minWidth: 32 }}>PWR</span>
+        <div style={{
+          width: 60, height: 8, background: '#001100', border: '1px solid #003300', borderRadius: 2,
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            width: `${energyPct}%`, height: '100%', background: energyColor,
+            transition: 'all 0.2s', boxShadow: `inset 0 0 4px ${energyColor}`
+          }} />
         </div>
-        <span style={{ color: energyColor, fontSize: 'clamp(7px, 1.2vw, 10px)' }}>{bot.energy.toFixed(0)}%</span>
+        <span style={{ color: energyColor, minWidth: 32, fontSize: 9 }}>{bot.energy.toFixed(0)}%</span>
       </div>
 
-      {/* Nodes — hide on small screens */}
-      <div style={{ color: '#006622', display: window.innerWidth < 500 ? 'none' : 'block' }}>
-        NODES <span style={{ color: '#00ff41' }}>{nodesCollected}/{nodesTotal}</span>
+      {/* Bot position */}
+      <div style={{ color: '#006622', userSelect: 'none' }}>
+        POS <span style={{ color: '#00d4ff', fontFamily: 'monospace' }}>[{bot.x},{bot.y}]</span>
+        {' '}<span style={{ color: '#ffb000' }}>{dirNames[bot.direction]}</span>
+      </div>
+
+      {/* Nodes collected */}
+      <div style={{ color: '#006622', userSelect: 'none' }}>
+        NODES <span style={{ color: '#00ff41', fontWeight: 'bold' }}>{nodesCollected}/{nodesTotal}</span>
       </div>
 
       {/* Score */}
-      <div style={{ color: '#006622' }}>
-        <span style={{ color: '#ffb000', fontWeight: 'bold' }}>{score}</span>
+      <div style={{ color: '#006622', userSelect: 'none' }}>
+        SCORE <span style={{ color: '#ffb000' }}>{score.toString().padStart(6, '0')}</span>
       </div>
 
-      {/* Warning */}
-      {isOverflow && (
-        <div style={{ color: '#ff0040', animation: 'blink 0.5s infinite', letterSpacing: 1, fontSize: 'clamp(7px, 1.2vw, 10px)' }}>
-          ⚠ OVERFLOW
+      {/* Memory overflow warning */}
+      {memoryUsed > memoryTotal && (
+        <div style={{
+          color: '#ff0040',
+          animation: 'blink 0.6s infinite',
+          letterSpacing: 2,
+          fontSize: 10,
+          marginLeft: 4,
+          fontWeight: 'bold'
+        }}>
+          ⚠ BUFFER_OVERFLOW
         </div>
       )}
 
+      {/* Status indicator */}
+      <div style={{
+        color: status === 'running' ? '#00ff41' : '#006622',
+        fontSize: 8,
+        letterSpacing: 1,
+        marginLeft: 'auto',
+        userSelect: 'none'
+      }}>
+        [{status.toUpperCase()}]
+      </div>
+
       {/* Controls */}
-      <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8 }}>
         {status === 'running' ? (
-          <>
-            <button onClick={() => dispatch(pauseExecution())} style={{ fontSize: 'clamp(8px, 1.2vw, 10px)', padding: '4px 10px', borderColor: '#ffb000', color: '#ffb000', minWidth: 'auto' }}>⏸ PAUSE</button>
-            <button onClick={onStop} className="danger" style={{ fontSize: 'clamp(8px, 1.2vw, 10px)', padding: '4px 10px', minWidth: 'auto' }}>■ HALT</button>
-          </>
-        ) : status === 'paused' ? (
-          <>
-            <button onClick={() => dispatch(resumeExecution())} style={{ fontSize: 'clamp(8px, 1.2vw, 10px)', padding: '4px 10px', borderColor: '#00ff41', color: '#00ff41', minWidth: 'auto' }}>▶ RESUME</button>
-            <button onClick={onStop} className="danger" style={{ fontSize: 'clamp(8px, 1.2vw, 10px)', padding: '4px 10px', minWidth: 'auto' }}>■ STOP</button>
-          </>
+          <button
+            onClick={onStop}
+            className="danger"
+            style={{ fontSize: 10, padding: '4px 12px' }}
+            data-tooltip="Halt execution"
+          >
+            ■ HALT
+          </button>
         ) : (
-          <button onClick={onRun} disabled={isOverflow} style={{ fontSize: 'clamp(8px, 1.2vw, 10px)', padding: '4px 10px', borderColor: '#00ff41', color: '#00ff41', minWidth: 'auto' }}>▶ EXEC</button>
+          <button
+            onClick={onRun}
+            disabled={memoryUsed > memoryTotal}
+            style={{ fontSize: 10, padding: '4px 12px', borderColor: '#00ff41', color: '#00ff41' }}
+            data-tooltip={memoryUsed > memoryTotal ? 'Memory overflow' : 'Execute program'}
+          >
+            ▶ EXEC
+          </button>
         )}
-        <button onClick={onReset} style={{ fontSize: 'clamp(8px, 1.2vw, 10px)', padding: '4px 10px', borderColor: '#ffb000', color: '#ffb000', minWidth: 'auto' }}>↺</button>
+        <button
+          onClick={onReset}
+          style={{ fontSize: 10, padding: '4px 12px', borderColor: '#ffb000', color: '#ffb000' }}
+          data-tooltip="Reset level"
+        >
+          ↺ RST
+        </button>
       </div>
     </div>
   )
