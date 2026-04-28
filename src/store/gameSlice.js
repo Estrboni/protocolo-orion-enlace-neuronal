@@ -27,9 +27,6 @@ const initialState = {
   showMenu: true,
   score: 0,
   totalScore: 0,
-  executionTime: 0,
-  executionSteps: 0,
-  executionStartTime: null,
 }
 
 const gameSlice = createSlice({
@@ -50,9 +47,6 @@ const gameSlice = createSlice({
       state.status = 'idle'
       state.executionStep = -1
       state.gameOver = false
-      state.executionTime = 0
-      state.executionSteps = 0
-      state.executionStartTime = null
       state.consoleLog.push({ type: 'warn', msg: '> REINICIANDO NIVEL...' })
     },
     nextLevel(state) {
@@ -66,13 +60,16 @@ const gameSlice = createSlice({
         state.status = 'idle'
         state.executionStep = -1
         state.gameOver = false
-        state.executionTime = 0
-        state.executionSteps = 0
-        state.executionStartTime = null
         state.consoleLog.push({ type: 'system', msg: `> NIVEL ${state.currentLevel + 1} CARGADO` })
       }
     },
     setStatus(state, action) { state.status = action.payload },
+    pauseExecution(state) {
+      if (state.status === 'running') state.status = 'paused'
+    },
+    resumeExecution(state) {
+      if (state.status === 'paused') state.status = 'running'
+    },
     updateBot(state, action) { state.bot = { ...state.bot, ...action.payload } },
     updateEnemies(state, action) { state.enemies = action.payload },
     collectNode(state, action) {
@@ -86,13 +83,11 @@ const gameSlice = createSlice({
       state.consoleLog.push(action.payload)
       if (state.consoleLog.length > 80) state.consoleLog.shift()
     },
-    setMemoryUsed(state, action) { state.memoryUsed = action.payload },
-    setExecutionStep(state, action) {
-      state.executionStep = action.payload
-      state.executionSteps = Math.max(state.executionSteps, action.payload + 1)
+    clearLog(state) {
+      state.consoleLog = []
     },
-    setExecutionStartTime(state, action) { state.executionStartTime = action.payload },
-    setExecutionTime(state, action) { state.executionTime = action.payload },
+    setMemoryUsed(state, action) { state.memoryUsed = action.payload },
+    setExecutionStep(state, action) { state.executionStep = action.payload },
     setGameOver(state, action) {
       state.gameOver = true
       state.status = action.payload === 'won' ? 'won' : 'lost'
@@ -100,7 +95,6 @@ const gameSlice = createSlice({
   }
 })
 
-export const { startGame, resetLevel, nextLevel, setStatus, updateBot, updateEnemies,
-               collectNode, addLog, setMemoryUsed, setExecutionStep, setGameOver, 
-               setExecutionStartTime, setExecutionTime } = gameSlice.actions
+export const { startGame, resetLevel, nextLevel, setStatus, pauseExecution, resumeExecution,
+               updateBot, updateEnemies, collectNode, addLog, clearLog, setMemoryUsed, setExecutionStep, setGameOver } = gameSlice.actions
 export default gameSlice.reducer

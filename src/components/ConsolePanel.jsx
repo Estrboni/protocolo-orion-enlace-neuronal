@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
-import { useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'react-redux'
+import { clearLog } from '../store/gameSlice'
 
 const TYPE_COLORS = {
   system: '#006622',
@@ -10,7 +11,8 @@ const TYPE_COLORS = {
 }
 
 export default function ConsolePanel() {
-  const { consoleLog, currentLevel, levelData, executionTime, executionSteps } = useSelector(s => s.game)
+  const dispatch = useDispatch()
+  const { consoleLog, currentLevel, levelData } = useSelector(s => s.game)
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -18,71 +20,46 @@ export default function ConsolePanel() {
   }, [consoleLog])
 
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      background: '#020a02',
-      border: '1px solid #002200',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden'
-    }}>
-      <div className="panel-header" style={{ fontSize: 9 }}>
-        SYSTEM CONSOLE
-        <span style={{ marginLeft: 'auto', color: '#003300', fontSize: 8 }}>LVL {currentLevel + 1}</span>
+    <div style={{ width: '100%', height: '100%', background: '#020a02', border: '1px solid #002200', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '4px 10px',
+        fontSize: 9,
+        letterSpacing: 3,
+        color: '#006622',
+        borderBottom: '1px solid #003300',
+        textTransform: 'uppercase'
+      }}>
+        <span>▶ CONSOLE</span>
+        <button onClick={() => dispatch(clearLog())} style={{
+          border: '1px solid #003300', background: 'transparent', color: '#003300',
+          padding: '2px 6px', fontSize: 8, cursor: 'pointer', transition: 'all 0.2s'
+        }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#ffb000'; e.currentTarget.style.borderColor = '#ffb000' }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#003300'; e.currentTarget.style.borderColor = '#003300' }}
+        >CLR</button>
       </div>
 
       {/* Hint */}
       {levelData?.hint && (
-        <div style={{
-          padding: '3px 8px',
-          background: '#001a00',
-          borderBottom: '1px solid #002200',
-          color: '#ffb000',
-          fontSize: 9,
-          letterSpacing: 1
-        }}>
+        <div style={{ padding: '3px 8px', background: '#001a00', borderBottom: '1px solid #002200', color: '#ffb000', fontSize: 8, letterSpacing: 1 }}>
           ⚡ {levelData.hint}
         </div>
       )}
 
-      {/* Stats bar */}
-      {executionSteps > 0 && (
-        <div style={{
-          padding: '2px 8px',
-          background: '#000505',
-          borderBottom: '1px solid #002200',
-          color: '#004400',
-          fontSize: 8,
-          display: 'flex',
-          gap: 16,
-          alignItems: 'center'
-        }}>
-          <span>STEPS: <span style={{ color: '#00ff41' }}>{executionSteps}</span></span>
-          <span>TIME: <span style={{ color: '#00ff41' }}>{(executionTime / 1000).toFixed(2)}s</span></span>
-          {executionSteps > 0 && (
-            <span>AVG: <span style={{ color: '#00ff41' }}>{((executionTime / executionSteps) || 0).toFixed(0)}ms</span></span>
-          )}
-        </div>
-      )}
-
       {/* Log */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '4px 8px',
-        fontFamily: 'var(--font-mono)',
-        fontSize: 9
-      }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 8px', fontFamily: 'var(--font-mono)', fontSize: 8 }}>
         {consoleLog.map((entry, i) => (
           <div key={i} style={{
             color: TYPE_COLORS[entry.type] ?? '#004400',
-            lineHeight: 1.5,
+            lineHeight: 1.4,
             animation: i === consoleLog.length - 1 ? 'fadeInUp 0.2s ease' : 'none',
             whiteSpace: 'pre-wrap',
-            wordBreak: 'break-all'
+            wordBreak: 'break-word'
           }}>
-            <span style={{ color: '#002200', marginRight: 4 }}>{String(i).padStart(3, '0')}|</span>
+            <span style={{ color: '#002200', marginRight: 4 }}>{String(i).padStart(2, '0')}|</span>
             {entry.msg}
           </div>
         ))}

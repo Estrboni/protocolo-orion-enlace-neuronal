@@ -2,7 +2,12 @@ import React, { useRef, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import { CELL } from '../levels/levelData'
 
-const CELL_SIZE = 36
+function getAdaptiveCellSize(windowWidth, windowHeight) {
+  if (windowWidth < 600) return 24
+  if (windowWidth < 1000) return 28
+  return 36
+}
+
 const COLORS = {
   [CELL.EMPTY]: '#050f05',
   [CELL.WALL]: '#001a00',
@@ -14,13 +19,10 @@ const COLORS = {
   [CELL.XOR_GATE]: '#ff0040',
 }
 
-function lerp(a, b, t) { return a + (b - a) * t }
-
 export default function Viewport() {
   const canvasRef = useRef(null)
-  const { bot, enemies, levelData, collectedNodes, status, executionStep } = useSelector(s => s.game)
-  const { blocks } = useSelector(s => s.program)
-  const animRef = useRef({ botX: bot.x, botY: bot.y, tick: 0, particles: [], explosions: [] })
+  const { bot, enemies, levelData, collectedNodes, status } = useSelector(s => s.game)
+  const animRef = useRef({ tick: 0, cellSize: 36 })
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -28,29 +30,29 @@ export default function Viewport() {
     const ctx = canvas.getContext('2d')
     let raf
 
-    function drawCell(x, y, type, isActive) {
-      const px = x * CELL_SIZE
-      const py = y * CELL_SIZE
+    function drawCell(x, y, type, cellSize, isActive) {
+      const px = x * cellSize
+      const py = y * cellSize
       const color = COLORS[type] ?? '#050f05'
 
       ctx.fillStyle = color
       if (type === CELL.WALL) {
         ctx.fillStyle = '#001a00'
-        ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE)
+        ctx.fillRect(px, py, cellSize, cellSize)
         ctx.strokeStyle = '#003300'
         ctx.lineWidth = 1
-        ctx.strokeRect(px + 0.5, py + 0.5, CELL_SIZE - 1, CELL_SIZE - 1)
+        ctx.strokeRect(px + 0.5, py + 0.5, cellSize - 1, cellSize - 1)
         // Wall pattern
         ctx.strokeStyle = '#002200'
         ctx.lineWidth = 0.5
-        for (let i = 0; i < CELL_SIZE; i += 8) {
-          ctx.beginPath(); ctx.moveTo(px + i, py); ctx.lineTo(px + i, py + CELL_SIZE); ctx.stroke()
+        for (let i = 0; i < cellSize; i += 6) {
+          ctx.beginPath(); ctx.moveTo(px + i, py); ctx.lineTo(px + i, py + cellSize); ctx.stroke()
         }
       } else {
-        ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE)
+        ctx.fillRect(px, py, cellSize, cellSize)
         ctx.strokeStyle = '#003300'
         ctx.lineWidth = 0.5
-        ctx.strokeRect(px + 0.5, py + 0.5, CELL_SIZE - 1, CELL_SIZE - 1)
+        ctx.strokeRect(px + 0.5, py + 0.5, cellSize - 1, cellSize - 1)
       }
 
       // Gate cells
@@ -58,151 +60,111 @@ export default function Viewport() {
         const labels = ['AND', 'OR', 'NOT', 'XOR']
         ctx.fillStyle = color
         ctx.globalAlpha = 0.15
-        ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE)
+        ctx.fillRect(px, py, cellSize, cellSize)
         ctx.globalAlpha = 1
         ctx.fillStyle = color
-        ctx.font = `bold 8px monospace`
+        ctx.font = `bold ${Math.max(6, cellSize * 0.25)}px monospace`
         ctx.textAlign = 'center'
-        ctx.fillText(labels[type - 5], px + CELL_SIZE / 2, py + CELL_SIZE / 2 + 3)
+        ctx.fillText(labels[type - 5], px + cellSize / 2, py + cellSize / 2 + 2)
         ctx.strokeStyle = color
         ctx.lineWidth = 1
-        ctx.strokeRect(px + 1, py + 1, CELL_SIZE - 2, CELL_SIZE - 2)
+        ctx.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2)
       }
     }
 
-    function drawDataNode(n, collected, tick) {
+    function drawDataNode(n, collected, tick, cellSize) {
       if (collected) return
-      const px = n.x * CELL_SIZE + CELL_SIZE / 2
-      const py = n.y * CELL_SIZE + CELL_SIZE / 2
-      const pulse = Math.sin(tick * 0.08 + n.id) * 3 + 6
-      const glow = Math.sin(tick * 0.05 + n.id * 0.7) * 5 + 12
+      const px = n.x * cellSize + cellSize / 2
+      const py = n.y * cellSize + cellSize / 2
+      const pulse = Math.sin(tick * 0.08 + n.id) * 2 + 4
 
       ctx.save()
       ctx.shadowColor = '#00ff41'
-      ctx.shadowBlur = glow
+      ctx.shadowBlur = 10 + pulse
       ctx.strokeStyle = '#00ff41'
       ctx.lineWidth = 1.5
       ctx.beginPath()
       ctx.arc(px, py, pulse, 0, Math.PI * 2)
       ctx.stroke()
 
-      // Inner pulsing diamond
       ctx.fillStyle = '#00ff41'
-      ctx.globalAlpha = 0.8
-      ctx.font = '10px monospace'
+      ctx.font = `${Math.max(6, cellSize * 0.4)}px monospace`
       ctx.textAlign = 'center'
-      ctx.fillText('◆', px, py + 4)
-      
-      // Outer ring
-      ctx.globalAlpha = 0.4
-      ctx.strokeStyle = '#00ff41'
-      ctx.lineWidth = 0.5
-      ctx.beginPath()
-      ctx.arc(px, py, pulse + 4, 0, Math.PI * 2)
-      ctx.stroke()
+      ctx.fillText('◆', px, py + 2)
       ctx.restore()
     }
 
-    function drawExit(exit, tick) {
-      const px = exit.x * CELL_SIZE
-      const py = exit.y * CELL_SIZE
+    function drawExit(exit, tick, cellSize) {
+      const px = exit.x * cellSize
+      const py = exit.y * cellSize
       const pulse = Math.sin(tick * 0.05) * 0.3 + 0.7
 
       ctx.save()
       ctx.globalAlpha = pulse
       ctx.fillStyle = '#ffb00022'
-      ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE)
+      ctx.fillRect(px, py, cellSize, cellSize)
       ctx.strokeStyle = '#ffb000'
       ctx.lineWidth = 2
       ctx.shadowColor = '#ffb000'
       ctx.shadowBlur = 10
-      ctx.strokeRect(px + 2, py + 2, CELL_SIZE - 4, CELL_SIZE - 4)
+      ctx.strokeRect(px + 2, py + 2, cellSize - 4, cellSize - 4)
       ctx.globalAlpha = 1
       ctx.fillStyle = '#ffb000'
-      ctx.font = '16px monospace'
+      ctx.font = `${cellSize * 0.6}px monospace`
       ctx.textAlign = 'center'
-      ctx.fillText('⬡', px + CELL_SIZE / 2, py + CELL_SIZE / 2 + 6)
+      ctx.fillText('⬡', px + cellSize / 2, py + cellSize / 2 + 3)
       ctx.restore()
     }
 
-    function drawBot(bx, by, direction, energy, tick) {
-      const px = bx * CELL_SIZE + CELL_SIZE / 2
-      const py = by * CELL_SIZE + CELL_SIZE / 2
-      const r = CELL_SIZE * 0.32
+    function drawBot(bx, by, direction, energy, tick, cellSize) {
+      const px = bx * cellSize + cellSize / 2
+      const py = by * cellSize + cellSize / 2
+      const r = cellSize * 0.32
 
       ctx.save()
-      // Glow based on energy state
-      const glowColor = energy < 20 ? '#ff0040' : '#00ff41'
-      ctx.shadowColor = glowColor
-      ctx.shadowBlur = 16
-      ctx.strokeStyle = glowColor
+      // Glow
+      ctx.shadowColor = energy < 20 ? '#ff0040' : '#00ff41'
+      ctx.shadowBlur = 12
+      ctx.strokeStyle = energy < 20 ? '#ff0040' : '#00ff41'
       ctx.lineWidth = 2
       ctx.beginPath()
       ctx.arc(px, py, r, 0, Math.PI * 2)
       ctx.stroke()
 
-      // Inner body with energy color
+      // Inner
       ctx.fillStyle = energy < 20 ? '#1a0000' : '#001a00'
       ctx.fill()
 
-      // Direction arrow pointing in bot direction
+      // Direction arrow
       const angle = direction * Math.PI / 2 - Math.PI / 2
       ctx.beginPath()
-      ctx.moveTo(px + Math.cos(angle) * (r - 4), py + Math.sin(angle) * (r - 4))
-      ctx.lineTo(px + Math.cos(angle + 2.5) * (r - 10), py + Math.sin(angle + 2.5) * (r - 10))
-      ctx.lineTo(px + Math.cos(angle - 2.5) * (r - 10), py + Math.sin(angle - 2.5) * (r - 10))
+      ctx.moveTo(px + Math.cos(angle) * (r - 3), py + Math.sin(angle) * (r - 3))
+      ctx.lineTo(px + Math.cos(angle + 2.5) * (r - 8), py + Math.sin(angle + 2.5) * (r - 8))
+      ctx.lineTo(px + Math.cos(angle - 2.5) * (r - 8), py + Math.sin(angle - 2.5) * (r - 8))
       ctx.closePath()
-      ctx.fillStyle = glowColor
-      ctx.shadowBlur = 8
+      ctx.fillStyle = energy < 20 ? '#ff0040' : '#00ff41'
+      ctx.shadowBlur = 6
       ctx.fill()
 
-      // Center dot for clarity
+      // Center dot
       ctx.fillStyle = '#000'
       ctx.beginPath()
-      ctx.arc(px, py, 3, 0, Math.PI * 2)
+      ctx.arc(px, py, 2, 0, Math.PI * 2)
       ctx.fill()
-
-      // Energy indicator ring (pulsing if low)
-      if (energy < 30) {
-        ctx.strokeStyle = glowColor
-        ctx.lineWidth = 0.5
-        ctx.globalAlpha = 0.6 + Math.sin(tick * 0.1) * 0.2
-        ctx.beginPath()
-        ctx.arc(px, py, r + 6, 0, Math.PI * 2)
-        ctx.stroke()
-      }
 
       ctx.restore()
     }
 
-    function drawEnemyThreat(e, tick) {
-      // Threat aura for sensed enemies (optional enhancement)
-      if (e.sensed) {
-        const px = e.x * CELL_SIZE + CELL_SIZE / 2
-        const py = e.y * CELL_SIZE + CELL_SIZE / 2
-        const auraSize = CELL_SIZE * 0.5 + Math.sin(tick * 0.08) * 2
-
-        ctx.save()
-        ctx.strokeStyle = '#ff0040'
-        ctx.lineWidth = 1.5
-        ctx.globalAlpha = 0.4 + Math.sin(tick * 0.1) * 0.2
-        ctx.beginPath()
-        ctx.arc(px, py, auraSize, 0, Math.PI * 2)
-        ctx.stroke()
-        ctx.restore()
-      }
-    }
-
-    function drawEnemy(e, tick) {
-      const px = e.x * CELL_SIZE + CELL_SIZE / 2
-      const py = e.y * CELL_SIZE + CELL_SIZE / 2
-      const r = CELL_SIZE * 0.28
+    function drawEnemy(e, tick, cellSize) {
+      const px = e.x * cellSize + cellSize / 2
+      const py = e.y * cellSize + cellSize / 2
+      const r = cellSize * 0.28
       const flicker = Math.sin(tick * 0.15 + e.id * 1.3) * 0.3 + 0.7
 
       ctx.save()
       ctx.globalAlpha = flicker
       ctx.shadowColor = '#ff0040'
-      ctx.shadowBlur = 14
+      ctx.shadowBlur = 12
       ctx.strokeStyle = '#ff0040'
       ctx.lineWidth = 1.5
       // Diamond shape
@@ -216,14 +178,11 @@ export default function Viewport() {
       ctx.fillStyle = '#1a0000'
       ctx.fill()
       ctx.fillStyle = '#ff0040'
-      ctx.font = '10px monospace'
+      ctx.font = `${cellSize * 0.5}px monospace`
       ctx.textAlign = 'center'
-      ctx.fillText('✕', px, py + 4)
+      ctx.fillText('✕', px, py + 2)
       ctx.globalAlpha = 1
       ctx.restore()
-
-      // Draw threat aura
-      drawEnemyThreat(e, tick)
     }
 
     function render() {
@@ -232,9 +191,13 @@ export default function Viewport() {
 
       if (!levelData) return
 
+      // Adaptive cell size
+      const cellSize = getAdaptiveCellSize(canvas.offsetWidth, canvas.offsetHeight)
+      animRef.current.cellSize = cellSize
+
       const grid = levelData.grid
-      const gridW = grid[0].length * CELL_SIZE
-      const gridH = grid.length * CELL_SIZE
+      const gridW = grid[0].length * cellSize
+      const gridH = grid.length * cellSize
 
       canvas.width = canvas.offsetWidth
       canvas.height = canvas.offsetHeight
@@ -253,28 +216,28 @@ export default function Viewport() {
       // Draw grid
       for (let y = 0; y < grid.length; y++) {
         for (let x = 0; x < grid[y].length; x++) {
-          drawCell(x, y, grid[y][x])
+          drawCell(x, y, grid[y][x], cellSize)
         }
       }
 
       // Draw exit
-      drawExit(levelData.exitPos, tick)
+      drawExit(levelData.exitPos, tick, cellSize)
 
       // Draw data nodes
-      levelData.dataNodes.forEach(n => drawDataNode(n, collectedNodes.includes(n.id), tick))
+      levelData.dataNodes.forEach(n => drawDataNode(n, collectedNodes.includes(n.id), tick, cellSize))
 
       // Draw enemies
-      enemies.forEach(e => drawEnemy(e, tick))
+      enemies.forEach(e => drawEnemy(e, tick, cellSize))
 
       // Draw bot
-      drawBot(bot.x, bot.y, bot.direction, bot.energy, tick)
+      drawBot(bot.x, bot.y, bot.direction, bot.energy, tick, cellSize)
 
       // Execution highlight
-      if (status === 'running') {
-        ctx.strokeStyle = '#00ff4133'
+      if (status === 'running' || status === 'paused') {
+        ctx.strokeStyle = status === 'paused' ? '#ffb04466' : '#00ff4133'
         ctx.lineWidth = 2
         ctx.setLineDash([4, 4])
-        ctx.strokeRect(bot.x * CELL_SIZE + 1, bot.y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2)
+        ctx.strokeRect(bot.x * cellSize + 1, bot.y * cellSize + 1, cellSize - 2, cellSize - 2)
         ctx.setLineDash([])
       }
 
@@ -288,9 +251,16 @@ export default function Viewport() {
   }, [bot, enemies, levelData, collectedNodes, status])
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-      <div className="panel-header" style={{ fontSize: 9 }}>VIEWPORT — SECTOR MAP</div>
-      <canvas ref={canvasRef} style={{ flex: 1, display: 'block', background: '#000', minHeight: 0 }} />
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <div style={{
+        padding: '4px 10px',
+        fontSize: 'clamp(7px, 1.2vw, 9px)',
+        letterSpacing: 3,
+        color: '#006622',
+        borderBottom: '1px solid #003300',
+        textTransform: 'uppercase'
+      }}>▶ VIEWPORT</div>
+      <canvas ref={canvasRef} style={{ width: '100%', height: 'calc(100% - 22px)', display: 'block', background: '#000' }} />
     </div>
   )
 }
