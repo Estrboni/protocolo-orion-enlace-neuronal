@@ -28,20 +28,19 @@ function PaletteBlock({ block }) {
       style={{
         border: `1px solid ${block.color}33`,
         background: `${block.color}11`,
-        padding: '3px 6px',
+        padding: 'clamp(2px, 0.5vw, 4px) clamp(4px, 1vw, 8px)',
         cursor: 'grab',
         opacity: isDragging ? 0.4 : 1,
         display: 'flex',
         alignItems: 'center',
-        gap: 6,
+        gap: 4,
         transition: 'all 0.15s',
-        fontSize: '9px',
+        fontSize: 'clamp(7px, 1vw, 9px)',
         borderRadius: 2,
       }}
       onMouseEnter={e => {
         e.currentTarget.style.background = `${block.color}22`
         e.currentTarget.style.borderColor = block.color
-        e.currentTarget.title = block.desc
       }}
       onMouseLeave={e => {
         e.currentTarget.style.background = `${block.color}11`
@@ -51,13 +50,13 @@ function PaletteBlock({ block }) {
       role="button"
       tabIndex={0}
     >
-      <span style={{ color: block.color, fontWeight: 'bold', fontSize: '9px' }}>{block.type}</span>
-      <span style={{ color: '#004400', fontSize: '8px' }}>{block.cost}KB</span>
+      <span style={{ color: block.color, fontWeight: 'bold' }}>{block.type}</span>
+      <span style={{ color: '#004400', fontSize: 'clamp(6px, 0.8vw, 8px)' }}>{block.cost}KB</span>
     </div>
   )
 }
 
-function ProgramBlock({ block, index, totalMemory, memMax }) {
+function ProgramBlock({ block, index, willExceed }) {
   const dispatch = useDispatch()
   const ref = useRef(null)
 
@@ -78,42 +77,43 @@ function ProgramBlock({ block, index, totalMemory, memMax }) {
   drag(drop(ref))
 
   const blockColor = BLOCK_PALETTE.find(b => b.type === block.type)?.color ?? '#00ff41'
-  const willExceed = totalMemory > memMax
 
   return (
     <div ref={ref}
       style={{
         border: `1px solid ${isOver ? blockColor : blockColor + '44'}`,
         background: isOver ? `${blockColor}22` : `${blockColor}0a`,
-        padding: '4px 8px',
+        padding: 'clamp(2px, 0.5vw, 4px) clamp(4px, 1vw, 8px)',
         cursor: 'grab',
         opacity: isDragging ? 0.3 : 1,
         display: 'flex',
         alignItems: 'center',
-        gap: 6,
+        gap: 4,
         transition: 'all 0.1s',
         marginBottom: 1,
-        fontSize: '9px',
+        fontSize: 'clamp(7px, 1vw, 9px)',
         borderRadius: 2,
         flexWrap: 'wrap',
+        minHeight: 'min-content'
       }}
       role="listitem"
       draggable>
-      <span style={{ color: '#003300', fontSize: '8px' }}>{String(index + 1).padStart(2, '0')}</span>
-      <span style={{ color: blockColor, fontWeight: 'bold', minWidth: 70, fontSize: '9px' }}>{block.type}</span>
+      <span style={{ color: '#003300', fontSize: 'clamp(6px, 0.8vw, 8px)' }}>{String(index + 1).padStart(2, '0')}</span>
+      <span style={{ color: blockColor, fontWeight: 'bold', minWidth: 60, fontSize: 'clamp(7px, 1vw, 9px)' }}>{block.type}</span>
 
       {/* Params */}
       {block.type === 'MOVE' && (
         <input type="number" min="1" max="10" value={block.params.steps ?? 1}
           onChange={e => dispatch(updateBlockParam({ id: block.id, key: 'steps', value: parseInt(e.target.value) }))}
           style={{
-            width: 32,
+            width: 28,
             background: '#000',
             border: '1px solid #003300',
             color: '#00ff41',
-            fontSize: '9px',
+            fontSize: 'clamp(7px, 1vw, 9px)',
             textAlign: 'center',
-            fontFamily: 'var(--font-mono)'
+            fontFamily: 'var(--font-mono)',
+            padding: '1px 2px'
           }}
           aria-label="Steps" />
       )}
@@ -124,25 +124,27 @@ function ProgramBlock({ block, index, totalMemory, memMax }) {
             background: '#000',
             border: '1px solid #003300',
             color: '#00d4ff',
-            fontSize: '9px',
-            fontFamily: 'var(--font-mono)'
+            fontSize: 'clamp(7px, 1vw, 9px)',
+            fontFamily: 'var(--font-mono)',
+            padding: '1px 2px'
           }}
           aria-label="Direction">
-          <option value="right">RIGHT</option>
-          <option value="left">LEFT</option>
+          <option value="right">R</option>
+          <option value="left">L</option>
         </select>
       )}
       {block.type === 'IF_SENSOR' && (
         <input type="number" min="1" max="6" value={block.params.range ?? 3}
           onChange={e => dispatch(updateBlockParam({ id: block.id, key: 'range', value: parseInt(e.target.value) }))}
           style={{
-            width: 32,
+            width: 28,
             background: '#000',
             border: '1px solid #003300',
             color: '#ffb000',
-            fontSize: '9px',
+            fontSize: 'clamp(7px, 1vw, 9px)',
             textAlign: 'center',
-            fontFamily: 'var(--font-mono)'
+            fontFamily: 'var(--font-mono)',
+            padding: '1px 2px'
           }}
           aria-label="Sensor range" />
       )}
@@ -153,31 +155,38 @@ function ProgramBlock({ block, index, totalMemory, memMax }) {
             background: '#000',
             border: '1px solid #003300',
             color: '#bf00ff',
-            fontSize: '9px',
-            fontFamily: 'var(--font-mono)'
+            fontSize: 'clamp(6px, 0.9vw, 8px)',
+            fontFamily: 'var(--font-mono)',
+            padding: '1px 2px'
           }}
           aria-label="Loop condition">
-          <option value="EXIT">EXIT_REACHED</option>
-          <option value="ALL_NODES">ALL_NODES</option>
-          <option value="NO_ENEMIES">NO_ENEMIES</option>
+          <option value="EXIT">EXT</option>
+          <option value="ALL_NODES">ALL</option>
+          <option value="NO_ENEMIES">EXE</option>
         </select>
       )}
       {block.type === 'WAIT' && (
         <input type="number" min="1" max="5" value={block.params.ticks ?? 1}
           onChange={e => dispatch(updateBlockParam({ id: block.id, key: 'ticks', value: parseInt(e.target.value) }))}
           style={{
-            width: 32,
+            width: 28,
             background: '#000',
             border: '1px solid #003300',
             color: '#006622',
-            fontSize: '9px',
+            fontSize: 'clamp(7px, 1vw, 9px)',
             textAlign: 'center',
-            fontFamily: 'var(--font-mono)'
+            fontFamily: 'var(--font-mono)',
+            padding: '1px 2px'
           }}
           aria-label="Wait ticks" />
       )}
 
-      <span style={{ marginLeft: 'auto', color: willExceed ? '#ff0040' : '#003300', fontSize: '8px', fontWeight: willExceed ? 'bold' : 'normal' }}>
+      <span style={{
+        marginLeft: 'auto',
+        color: willExceed ? '#ff0040' : '#003300',
+        fontSize: 'clamp(6px, 0.8vw, 8px)',
+        fontWeight: willExceed ? 'bold' : 'normal'
+      }}>
         {block.cost}KB
       </span>
       <button onClick={() => dispatch(removeBlock(block.id))}
@@ -186,9 +195,10 @@ function ProgramBlock({ block, index, totalMemory, memMax }) {
           background: 'none',
           color: '#ff004066',
           cursor: 'pointer',
-          fontSize: '10px',
-          padding: '0 2px',
-          lineHeight: 1
+          fontSize: 'clamp(8px, 1vw, 10px)',
+          padding: '0 1px',
+          lineHeight: 1,
+          transition: 'color 0.15s'
         }}
         onMouseEnter={e => e.currentTarget.style.color = '#ff0040'}
         onMouseLeave={e => e.currentTarget.style.color = '#ff004066'}
@@ -210,21 +220,21 @@ function DropZone() {
   return (
     <div ref={drop} style={{
       flex: 1,
-      minHeight: 40,
+      minHeight: 30,
       border: isOver ? '1px dashed #00ff41' : '1px dashed #002200',
       background: isOver ? '#00ff4108' : 'transparent',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       color: '#003300',
-      fontSize: '9px',
+      fontSize: 'clamp(7px, 1.5vw, 9px)',
       letterSpacing: 2,
       transition: 'all 0.15s',
       borderRadius: 2
     }}
       role="region"
       aria-label="Drop zone for logic blocks">
-      {isOver ? '+ DROP BLOCK' : '— DRAG BLOCKS HERE —'}
+      {isOver ? '+ DROP' : '— DRAG HERE —'}
     </div>
   )
 }
@@ -249,15 +259,16 @@ export default function LogicDeck() {
     }}
       role="region"
       aria-label="Logic programming deck">
-      <div className="panel-header" style={{ fontSize: '9px' }}>
+      <div className="panel-header" style={{ fontSize: 'clamp(7px, 1.5vw, 9px)' }}>
         LOGIC DECK
         <span style={{
           marginLeft: 'auto',
           color: overflow ? '#ff0040' : '#006622',
-          fontSize: '8px',
-          animation: overflow ? 'blink 0.6s infinite' : 'none'
+          fontSize: 'clamp(6px, 1.2vw, 8px)',
+          animation: overflow ? 'blink 0.6s infinite' : 'none',
+          fontWeight: overflow ? 'bold' : 'normal'
         }}>
-          {memUsed}/{memTotal}KB {overflow && '⚠ OVERFLOW'}
+          {memUsed}KB/{memTotal}KB {overflow && '⚠'}
         </span>
       </div>
 
@@ -266,7 +277,7 @@ export default function LogicDeck() {
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
         gap: 1,
-        padding: 4,
+        padding: 3,
         borderBottom: '1px solid #002200',
         overflow: 'auto',
         maxHeight: '35%'
@@ -280,9 +291,10 @@ export default function LogicDeck() {
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: 4,
+        padding: 3,
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        minHeight: 0
       }}
         role="list"
         aria-label="Program instructions">
@@ -291,12 +303,7 @@ export default function LogicDeck() {
         ) : (
           <>
             {blocks.map((b, i) => (
-              <ProgramBlock
-                key={b.id}
-                block={b}
-                index={i}
-                totalMemory={memUsed}
-                memMax={memTotal} />
+              <ProgramBlock key={b.id} block={b} index={i} willExceed={overflow} />
             ))}
             <DropZone />
           </>
@@ -305,21 +312,19 @@ export default function LogicDeck() {
 
       {/* Footer */}
       <div style={{
-        padding: '4px 8px',
+        padding: 'clamp(2px, 0.5vh, 4px) clamp(4px, 1vw, 8px)',
         borderTop: '1px solid #002200',
         display: 'flex',
-        gap: 6,
+        gap: 4,
         alignItems: 'center',
-        justifyContent: 'space-between'
+        fontSize: 'clamp(7px, 1vw, 9px)',
+        flexShrink: 0
       }}>
-        <span style={{ color: '#003300', fontSize: '9px', flex: 1 }}>
-          {blocks.length} opcodes loaded
-        </span>
-        <button
-          onClick={() => dispatch(clearProgram())}
-          className="danger"
-          style={{ fontSize: '8px', padding: '2px 8px' }}
-          aria-label="Clear all blocks">
+        <span style={{ color: '#003300', flex: 1 }}>{blocks.length} opcodes</span>
+        <button onClick={() => dispatch(clearProgram())} className="danger" style={{
+          fontSize: 'clamp(7px, 1vw, 9px)',
+          padding: 'clamp(2px, 0.5vh, 3px) clamp(4px, 1vw, 6px)'
+        }} aria-label="Clear program">
           CLR
         </button>
       </div>
