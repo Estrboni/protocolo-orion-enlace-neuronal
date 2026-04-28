@@ -16,11 +16,7 @@
   --font-display: 'VT323', monospace;
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body, #root {
   width: 100vw;
@@ -29,26 +25,14 @@ html, body, #root {
   background: var(--bg-primary);
   font-family: var(--font-mono);
   color: var(--text-primary);
-  -webkit-font-smoothing: antialiased;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-  position: fixed;
-}
-
-body {
-  margin: 0;
-  padding: 0;
 }
 
 /* CRT scanline overlay */
 body::after {
   content: '';
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
   background: repeating-linear-gradient(
     0deg,
     transparent,
@@ -60,7 +44,7 @@ body::after {
   z-index: 9999;
 }
 
-/* Vignette effect */
+/* Vignette overlay */
 body::before {
   content: '';
   position: fixed;
@@ -71,25 +55,11 @@ body::before {
 }
 
 /* Scrollbar */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #000; }
+::-webkit-scrollbar-thumb { background: var(--neon-green); border-radius: 2px; }
 
-::-webkit-scrollbar-track {
-  background: #000;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--neon-green);
-  border-radius: 2px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--neon-cyan);
-}
-
-/* Animations */
+/* Glitch animation */
 @keyframes glitch {
   0%, 90%, 100% { transform: translate(0); }
   92% { transform: translate(-2px, 1px); clip-path: inset(20% 0 50% 0); }
@@ -108,13 +78,13 @@ body::before {
 }
 
 @keyframes pulse-green {
-  0%, 100% { box-shadow: 0 0 5px var(--neon-green); }
-  50% { box-shadow: 0 0 20px var(--neon-green), 0 0 40px var(--neon-green); }
+  0%, 100% { box-shadow: 0 0 5px var(--neon-green), inset 0 0 10px var(--neon-green)22; }
+  50% { box-shadow: 0 0 20px var(--neon-green), 0 0 40px var(--neon-green), inset 0 0 20px var(--neon-green)33; }
 }
 
-@keyframes pulse-red {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+@keyframes pulse-amber {
+  0%, 100% { box-shadow: 0 0 5px var(--neon-amber); }
+  50% { box-shadow: 0 0 20px var(--neon-amber), 0 0 40px var(--neon-amber); }
 }
 
 @keyframes blink {
@@ -128,54 +98,30 @@ body::before {
 }
 
 @keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
 }
 
-@keyframes vignette {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 0.9; }
+@keyframes neon-flare {
+  0%, 100% { text-shadow: 0 0 7px var(--neon-green), 0 0 10px var(--neon-green); }
+  50% { text-shadow: 0 0 20px var(--neon-green), 0 0 40px var(--neon-green), 0 0 60px var(--neon-green); }
 }
 
-@keyframes nodeFloat {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-4px); }
+@keyframes explode {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2); }
 }
 
-@keyframes bootLine {
-  from { clip-path: inset(0 100% 0 0); }
-  to { clip-path: inset(0 0 0 0); }
-}
-
-@keyframes scanBeam {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
-}
-
-/* Neon text effects */
-.neon-text {
-  text-shadow: 0 0 7px var(--neon-green), 0 0 10px var(--neon-green);
-}
-
-.neon-amber {
-  color: var(--neon-amber);
-  text-shadow: 0 0 7px var(--neon-amber);
-}
-
-.neon-cyan {
-  color: var(--neon-cyan);
-  text-shadow: 0 0 7px var(--neon-cyan);
-}
-
-.neon-red {
-  color: var(--neon-red);
-  text-shadow: 0 0 7px var(--neon-red);
-}
+.neon-text { text-shadow: 0 0 7px var(--neon-green), 0 0 10px var(--neon-green); }
+.neon-amber { color: var(--neon-amber); text-shadow: 0 0 7px var(--neon-amber); }
+.neon-cyan { color: var(--neon-cyan); text-shadow: 0 0 7px var(--neon-cyan); }
+.neon-red { color: var(--neon-red); text-shadow: 0 0 7px var(--neon-red); }
 
 .panel {
   background: var(--bg-panel);
   border: 1px solid var(--border-color);
   position: relative;
+  box-shadow: inset 0 0 20px rgba(0, 255, 65, 0.05);
 }
 
 .panel::before {
@@ -189,8 +135,8 @@ body::before {
 }
 
 .panel-header {
-  padding: clamp(2px, 0.5vh, 6px) clamp(6px, 1vw, 12px);
-  font-size: clamp(8px, 1vw, 12px);
+  padding: 4px 10px;
+  font-size: 10px;
   letter-spacing: 3px;
   color: var(--text-dim);
   border-bottom: 1px solid var(--border-color);
@@ -198,15 +144,14 @@ body::before {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
-  white-space: nowrap;
+  background: linear-gradient(90deg, rgba(0,255,65,0.02) 0%, transparent 100%);
 }
 
 .panel-header::before {
   content: '▶';
   color: var(--neon-green);
-  font-size: clamp(6px, 0.8vw, 10px);
-  flex-shrink: 0;
+  font-size: 8px;
+  animation: blink 3s infinite;
 }
 
 button {
@@ -215,160 +160,161 @@ button {
   border: 1px solid var(--neon-green);
   background: transparent;
   color: var(--neon-green);
-  padding: clamp(3px, 0.5vw, 8px) clamp(8px, 1vw, 16px);
-  font-size: clamp(9px, 1vw, 12px);
+  padding: 6px 16px;
+  font-size: 12px;
   letter-spacing: 2px;
   text-transform: uppercase;
   transition: all 0.15s;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 0 10px var(--neon-green)22;
 }
 
-button:hover:not(:disabled) {
+button::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, var(--neon-green)44, transparent);
+  transition: left 0.5s;
+}
+
+button:hover::before { left: 100%; }
+
+button:hover {
   background: var(--neon-green);
   color: #000;
-  box-shadow: 0 0 15px var(--neon-green);
-  transform: scale(1.02);
+  box-shadow: 0 0 25px var(--neon-green), inset 0 0 15px var(--neon-green)44;
+  transform: translateY(-1px);
 }
 
-button:active:not(:disabled) {
-  transform: scale(0.98);
+button:active {
+  transform: translateY(1px);
+  box-shadow: 0 0 15px var(--neon-green), inset 0 0 10px var(--neon-green)66;
 }
 
 button:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 button.danger {
   border-color: var(--neon-red);
   color: var(--neon-red);
+  box-shadow: 0 0 10px var(--neon-red)22;
 }
 
-button.danger:hover:not(:disabled) {
+button.danger:hover {
   background: var(--neon-red);
   color: #000;
-  box-shadow: 0 0 15px var(--neon-red);
+  box-shadow: 0 0 25px var(--neon-red), inset 0 0 15px var(--neon-red)44;
 }
 
 button.amber {
   border-color: var(--neon-amber);
   color: var(--neon-amber);
+  box-shadow: 0 0 10px var(--neon-amber)22;
 }
 
-button.amber:hover:not(:disabled) {
+button.amber:hover {
   background: var(--neon-amber);
   color: #000;
-  box-shadow: 0 0 15px var(--neon-amber);
+  box-shadow: 0 0 25px var(--neon-amber), inset 0 0 15px var(--neon-amber)44;
 }
 
-/* Input fields */
-input, select {
-  font-family: var(--font-mono);
-  background: #000;
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  padding: 2px 4px;
-  font-size: inherit;
-  transition: all 0.15s;
-}
-
-input:focus, select:focus {
-  outline: none;
-  border-color: var(--neon-cyan);
-  box-shadow: 0 0 8px var(--neon-cyan);
-}
-
-/* Mobile optimizations */
-@media (max-width: 1024px) {
-  .panel-header {
-    font-size: clamp(7px, 2vw, 10px);
-    padding: clamp(2px, 1vh, 4px) clamp(4px, 2vw, 8px);
-  }
-
-  button {
-    padding: clamp(2px, 1vh, 6px) clamp(6px, 2vw, 12px);
-    font-size: clamp(8px, 2vw, 11px);
-  }
-}
-
-@media (max-width: 768px) {
-  ::-webkit-scrollbar {
-    width: 3px;
-    height: 3px;
-  }
-
-  button {
-    padding: clamp(4px, 2vw, 8px) clamp(8px, 3vw, 12px);
-    font-size: clamp(9px, 3vw, 11px);
-    letter-spacing: 1px;
-  }
-}
-
-/* Prevent elastic scroll on iOS */
-html {
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-  overscroll-behavior: none;
-  position: fixed;
-  width: 100%;
-  height: 100%;
-}
-
-body {
-  position: fixed;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-#root {
-  width: 100%;
-  height: 100%;
-  position: fixed;
-}
-
-/* Ensure inputs don't zoom on iOS */
 input, select, textarea {
-  font-size: 16px !important;
+  font-family: var(--font-mono);
+  background: #001100;
+  border: 1px solid #003300;
+  color: var(--neon-green);
+  padding: 4px 6px;
+  font-size: 10px;
+  transition: all 0.2s;
 }
 
-/* Tooltip system */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--neon-green);
+  box-shadow: 0 0 10px var(--neon-green)44, inset 0 0 6px var(--neon-green)22;
+  background: #002200;
+}
+
+/* Slider styling */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: #001100;
+  border: 1px solid #003300;
+  border-radius: 3px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--neon-green);
+  border: 1px solid var(--neon-green);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 6px var(--neon-green);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: var(--neon-green);
+  border: 1px solid var(--neon-green);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 6px var(--neon-green);
+}
+
+/* Data attribute tooltips */
 [data-tip] {
   position: relative;
 }
 
-[data-tip]:hover::after {
+[data-tip]::after {
   content: attr(data-tip);
   position: absolute;
-  bottom: calc(100% + 4px);
+  bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
+  background: #000;
+  color: var(--neon-green);
   padding: 4px 8px;
-  white-space: nowrap;
-  font-size: 9px;
-  z-index: 1000;
+  border: 1px solid var(--neon-green);
   border-radius: 2px;
+  font-size: 8px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 100;
   box-shadow: 0 0 10px var(--neon-green)44;
 }
 
-/* Accessibility */
-:focus-visible {
-  outline: 2px solid var(--neon-cyan);
-  outline-offset: 2px;
+[data-tip]:hover::after {
+  opacity: 1;
 }
 
-button:focus-visible {
-  outline: 2px solid var(--neon-green);
+/* Spinner animation */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-/* Print styles */
-@media print {
-  body::after,
-  body::before {
-    display: none;
-  }
+.spinner {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--neon-green)44;
+  border-top-color: var(--neon-green);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
