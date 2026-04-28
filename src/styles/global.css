@@ -16,13 +16,7 @@
   --font-display: 'VT323', monospace;
 }
 
-*, *::before, *::after { 
-  box-sizing: border-box; 
-  margin: 0; 
-  padding: 0; 
-  -webkit-user-select: none;
-  user-select: none;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body, #root {
   width: 100vw;
@@ -31,6 +25,9 @@ html, body, #root {
   background: var(--bg-primary);
   font-family: var(--font-mono);
   color: var(--text-primary);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /* CRT scanline overlay */
@@ -51,7 +48,7 @@ body::after {
 }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: #000; }
 ::-webkit-scrollbar-thumb { background: var(--neon-green); border-radius: 2px; }
 
@@ -88,16 +85,27 @@ body::after {
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes shimmer {
-  0% { background-position: -100% center; }
-  100% { background-position: 100% center; }
+@keyframes shimmerSweep {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+@keyframes nodeFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 
+@keyframes enemyPulse {
+  0%, 100% { box-shadow: 0 0 10px var(--neon-red); }
+  50% { box-shadow: 0 0 20px var(--neon-red), inset 0 0 10px var(--neon-red); }
+}
+
+@keyframes bootLine {
+  0% { width: 0; }
+  100% { width: 100%; }
+}
+
+/* Utility classes */
 .neon-text { text-shadow: 0 0 7px var(--neon-green), 0 0 10px var(--neon-green); }
 .neon-amber { color: var(--neon-amber); text-shadow: 0 0 7px var(--neon-amber); }
 .neon-cyan { color: var(--neon-cyan); text-shadow: 0 0 7px var(--neon-cyan); }
@@ -121,7 +129,7 @@ body::after {
 
 .panel-header {
   padding: 4px 10px;
-  font-size: clamp(9px, 2vw, 11px);
+  font-size: 10px;
   letter-spacing: 3px;
   color: var(--text-dim);
   border-bottom: 1px solid var(--border-color);
@@ -129,14 +137,14 @@ body::after {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  font-weight: 600;
 }
 
 .panel-header::before {
   content: '▶';
   color: var(--neon-green);
   font-size: 8px;
-  flex-shrink: 0;
+  animation: flicker 4s infinite;
 }
 
 button {
@@ -146,20 +154,20 @@ button {
   background: transparent;
   color: var(--neon-green);
   padding: 6px 16px;
-  font-size: clamp(10px, 2vw, 12px);
+  font-size: 12px;
   letter-spacing: 2px;
   text-transform: uppercase;
   transition: all 0.15s;
   position: relative;
   overflow: hidden;
-  touch-action: manipulation;
-  will-change: box-shadow;
+  font-weight: 600;
 }
 
 button:hover:not(:disabled) {
   background: var(--neon-green);
   color: #000;
-  box-shadow: 0 0 15px var(--neon-green);
+  box-shadow: 0 0 15px var(--neon-green), inset 0 0 10px var(--neon-green)33;
+  transform: scale(1.02);
 }
 
 button:active:not(:disabled) {
@@ -178,8 +186,8 @@ button.danger {
 
 button.danger:hover:not(:disabled) {
   background: var(--neon-red);
-  color: #000;
-  box-shadow: 0 0 15px var(--neon-red);
+  color: #fff;
+  box-shadow: 0 0 15px var(--neon-red), inset 0 0 10px var(--neon-red)33;
 }
 
 button.amber {
@@ -190,57 +198,98 @@ button.amber {
 button.amber:hover:not(:disabled) {
   background: var(--neon-amber);
   color: #000;
+  box-shadow: 0 0 15px var(--neon-amber);
 }
 
-input[type="text"],
-input[type="number"],
-select {
+/* Input/select styling */
+input, select {
   font-family: var(--font-mono);
-  background: #000;
+  font-size: 12px;
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
-  color: var(--neon-green);
+  color: var(--text-primary);
   padding: 4px 6px;
-  font-size: clamp(10px, 2vw, 12px);
   transition: all 0.15s;
 }
 
-input[type="text"]:focus,
-input[type="number"]:focus,
-select:focus {
+input:focus, select:focus {
   outline: none;
-  border-color: var(--neon-green);
-  box-shadow: 0 0 8px var(--neon-green);
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 10px var(--neon-cyan)55, inset 0 0 5px var(--neon-cyan)22;
+  background: var(--bg-primary);
 }
 
-/* Mobile optimizations */
+input::selection {
+  background: var(--neon-green)55;
+  color: var(--text-primary);
+}
+
+/* Mobile responsiveness */
 @media (max-width: 768px) {
-  button {
-    padding: 8px 12px;
-    font-size: 11px;
-  }
-  
   .panel-header {
+    font-size: 9px;
+    padding: 3px 8px;
+  }
+
+  button {
+    font-size: 11px;
+    padding: 5px 12px;
+  }
+
+  input, select {
+    font-size: 11px;
+    padding: 3px 5px;
+  }
+
+  ::-webkit-scrollbar { width: 3px; height: 3px; }
+}
+
+@media (max-width: 480px) {
+  .panel-header {
+    font-size: 8px;
+    padding: 2px 6px;
+    gap: 4px;
+  }
+
+  button {
     font-size: 10px;
-    padding: 6px 8px;
+    padding: 4px 10px;
+    letter-spacing: 1px;
+  }
+
+  input, select {
+    font-size: 10px;
+    width: auto;
+    max-width: 60px;
   }
 }
 
-/* Reduce motion for accessibility */
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+/* Tooltip support */
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-panel);
+  color: var(--neon-amber);
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  font-size: 9px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 100;
+  box-shadow: 0 0 10px var(--neon-amber)44;
 }
 
-/* Touch feedback */
-input::-webkit-outer-spin-button,
-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+[data-tip]:hover::after {
+  opacity: 1;
 }
 
-input[type=number] {
-  -moz-appearance: textfield;
+/* Animations on focus */
+*:focus-visible {
+  outline: 1px solid var(--neon-cyan);
+  outline-offset: 2px;
 }

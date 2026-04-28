@@ -17,6 +17,7 @@ export default function MainGame() {
   const executionRef = useRef(null)
   const stepRef = useRef(0)
   const enemyTickRef = useRef(0)
+  const feedbackRef = useRef({ showNodeCollect: false, nodeId: null })
 
   const stopExecution = useCallback(() => {
     if (executionRef.current) { clearTimeout(executionRef.current); executionRef.current = null }
@@ -41,10 +42,17 @@ export default function MainGame() {
     const newBot = result.bot
     dispatch(updateBot(newBot))
 
+    // Check node collection
     const newlyCollected = checkNodeCollection(newBot, levelData.dataNodes, currentCollected)
-    newlyCollected.forEach(id => dispatch(collectNode(id)))
+    newlyCollected.forEach(id => {
+      dispatch(collectNode(id))
+      feedbackRef.current.showNodeCollect = true
+      feedbackRef.current.nodeId = id
+      setTimeout(() => { feedbackRef.current.showNodeCollect = false }, 600)
+    })
     const allCollected = [...currentCollected, ...newlyCollected]
 
+    // Move enemies every 2 steps
     enemyTickRef.current += 1
     let newEnemies = currentEnemies
     if (enemyTickRef.current % 2 === 0) {
@@ -52,6 +60,7 @@ export default function MainGame() {
       dispatch(updateEnemies(newEnemies))
     }
 
+    // Check enemy collision
     const caught = newEnemies.some(e => e.x === newBot.x && e.y === newBot.y)
     if (caught) {
       dispatch(addLog({ type: 'error', msg: `> FATAL: ENEMY_COLLISION — bot destroyed at [${newBot.x},${newBot.y}]` }))
@@ -60,6 +69,7 @@ export default function MainGame() {
       return
     }
 
+    // Check win
     if (checkWinCondition(newBot, levelData, allCollected)) {
       dispatch(addLog({ type: 'success', msg: `> WIN_CONDITION_MET — all nodes collected, exit reached!` }))
       dispatch(setGameOver('won'))
@@ -100,19 +110,9 @@ export default function MainGame() {
     dispatch(clearProgram())
   }, [stopExecution, dispatch])
 
-  // Keyboard shortcuts: Space=Run, X=Stop, R=Reset, N=Next
-  useEffect(() => {
-    function handleKeyDown(e) {
-      if (e.code === 'Space') { e.preventDefault(); handleRun() }
-      if (e.code === 'KeyX') { handleStop() }
-      if (e.code === 'KeyR' && e.ctrlKey) { e.preventDefault(); handleReset() }
-      if (e.code === 'KeyN' && e.ctrlKey) { e.preventDefault(); handleNext() }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleRun, handleStop, handleReset, handleNext])
-
   useEffect(() => () => { if (executionRef.current) clearTimeout(executionRef.current) }, [])
+
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
 
   return (
     <div style={{
@@ -127,58 +127,73 @@ export default function MainGame() {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'clamp(240px, 1fr, 400px) 1fr',
-        gridTemplateRows: '1fr auto',
+        gridTemplateColumns: isMobile ? '1fr' : '1fr 320px',
+        gridTemplateRows: isMobile ? '1fr auto auto' : '1fr 180px',
         gap: 2,
         padding: '2px',
         height: '100%',
-        overflow: 'hidden',
-        '@media (max-width: 768px)': {
-          gridTemplateColumns: '1fr',
-          gridTemplateRows: '1fr auto auto'
-        }
+        overflow: 'hidden'
       }}>
         {/* Viewport */}
-        <div style={{ gridColumn: '2', gridRow: '1 / 3', overflow: 'hidden', '@media (max-width: 768px)': { gridColumn: '1', gridRow: '1' } }}>
+        <div style={{ gridRow: isMobile ? '1' : '1 / 3', overflow: 'hidden' }}>
           <Viewport />
         </div>
 
         {/* Logic Deck */}
-        <div style={{ overflow: 'hidden', '@media (max-width: 768px)': { gridColumn: '1', gridRow: '2' } }}>
+        <div style={{ 
+          overflow: 'hidden',
+          minHeight: isMobile ? '140px' : 'auto'
+        }}>
           <LogicDeck />
         </div>
 
         {/* Console */}
-        <div style={{ overflow: 'hidden', '@media (max-width: 768px)': { gridColumn: '1', gridRow: '3' } }}>
+        <div style={{ overflow: 'hidden', minHeight: isMobile ? '120px' : 'auto' }}>
           <ConsolePanel />
         </div>
       </div>
 
-      {/* Game over overlay */}
+      {/* Game over overlay — enhanced */}
       {(status === 'won' || status === 'lost') && (
         <div style={{
           position: 'fixed', inset: 0, background: '#00000099',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000, flexDirection: 'column', gap: 24
+          zIndex: 1000, flexDirection: 'column', gap: 24,
+          backdropFilter: 'blur(3px)'
         }}>
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 'clamp(24px, 6vw, 72px)',
+            fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 6vw, 72px)',
             color: status === 'won' ? '#00ff41' : '#ff0040',
-            textShadow: `0 0 40px ${status === 'won' ? '#00ff41' : '#ff0040'}`,
+            textShadow: `0 0 40px ${status === 'won' ? '#00ff41' : '#ff0040'}, 0 0 80px ${status === 'won' ? '#00ff4155' : '#ff004055'}`,
             letterSpacing: 8,
-            animation: 'glitch 0.5s infinite'
+            animation: 'glitch 0.5s infinite',
+            marginTop: -32
           }}>
             {status === 'won' ? '✓ LEVEL COMPLETE' : '✗ SYSTEM FAILURE'}
           </div>
+          
           {status === 'won' && (
-            <div style={{ color: '#ffb000', fontFamily: 'var(--font-mono)', fontSize: 14, letterSpacing: 4 }}>
+            <div style={{ 
+              color: '#ffb000', fontFamily: 'var(--font-mono)', fontSize: 14, letterSpacing: 4,
+              textShadow: '0 0 20px #ffb000'
+            }}>
               SCORE: {score} pts
             </div>
           )}
+
+          {status === 'lost' && (
+            <div style={{ 
+              color: '#ff0040', fontFamily: 'var(--font-mono)', fontSize: 12, 
+              textAlign: 'center', opacity: 0.8, maxWidth: 300
+            }}>
+              Program execution failed. Check logic and retry.
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button onClick={handleReset} title="Reset level (Ctrl+R)">RETRY</button>
+            <button onClick={handleReset} style={{ fontSize: 10, padding: '8px 16px' }}>RETRY</button>
             {status === 'won' && currentLevel < 4 && (
-              <button onClick={handleNext} title="Next level (Ctrl+N)" style={{ borderColor: '#00ff41', color: '#00ff41' }}>NEXT LEVEL</button>
+              <button onClick={handleNext} style={{ fontSize: 10, padding: '8px 16px', borderColor: '#00ff41', color: '#00ff41' }}>NEXT LEVEL</button>
             )}
           </div>
         </div>
