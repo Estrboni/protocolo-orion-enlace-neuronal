@@ -237,3 +237,94 @@ input:focus, select:focus {
     padding: clamp(6px, 1.5vw, 10px) clamp(10px, 2vw, 14px);
   }
 }
+
+/* === ITERATION 2: ENHANCED ANIMATIONS & INTERACTIONS === */
+
+@keyframes popIn {
+  0% { transform: scale(0.8) translateY(10px); opacity: 0; }
+  70% { transform: scale(1.05); }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@keyframes slideInDown {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes wallHitShake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-2px, 1px); }
+  50% { transform: translate(2px, -1px); }
+  75% { transform: translate(-1px, 1px); }
+}
+
+@keyframes blockSlideIn {
+  from { transform: translateX(-20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes highlightFade {
+  0% { background: #ffb00033; }
+  100% { background: transparent; }
+}
+
+.hud { animation: slideInDown 0.4s ease; }
+.console-entry { animation: slideInUp 0.2s ease; }
+.console-entry.highlight { animation: highlightFade 1s ease forwards; }
+
+canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Touch optimizations for mobile/tablet */
+@media (hover: none) and (pointer: coarse) {
+  button {
+    min-height: 44px;
+    padding: 8px 20px;
+  }
+  
+  input[type="number"],
+  select {
+    min-height: 40px;
+    font-size: 16px;
+  }
+}
+
+/* Tablet optimizations */
+@media (max-width: 1200px) {
+  .panel {
+    font-size: 11px;
+  }
+  
+  button {
+    padding: 8px 14px;
+    font-size: 11px;
+  }
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  html, body, #root {
+    font-size: 12px;
+  }
+  
+  button {
+    padding: 6px 12px;
+    font-size: 10px;
+  }
+  
+  input[type="number"],
+  select {
+    font-size: 14px;
+  }
+  
+  .panel-header {
+    font-size: 8px;
+  }
+}

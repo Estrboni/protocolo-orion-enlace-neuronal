@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
-import { resetLevel, nextLevel, addLog, updateBot, updateEnemies, collectNode, setGameOver, setStatus, pauseExecution } from '../store/gameSlice'
+import { resetLevel, nextLevel, addLog, updateBot, updateEnemies, collectNode, setGameOver, setStatus } from '../store/gameSlice'
 import { setExecutionStep } from '../store/gameSlice'
 import Viewport from './Viewport'
 import LogicDeck from './LogicDeck'
@@ -17,7 +17,18 @@ export default function MainGame() {
   const executionRef = useRef(null)
   const stepRef = useRef(0)
   const enemyTickRef = useRef(0)
-  const pausedStateRef = useRef({ bot: null, enemies: null, collectedNodes: null, step: 0 })
+  const shakeRef = useRef(null)
+  const containerRef = useRef(null)
+
+  const triggerShake = useCallback(() => {
+    if (shakeRef.current) clearTimeout(shakeRef.current)
+    if (containerRef.current) {
+      containerRef.current.style.animation = 'wallHitShake 0.3s'
+      shakeRef.current = setTimeout(() => {
+        if (containerRef.current) containerRef.current.style.animation = ''
+      }, 300)
+    }
+  }, [])
 
   const stopExecution = useCallback(() => {
     if (executionRef.current) { clearTimeout(executionRef.current); executionRef.current = null }
@@ -42,12 +53,15 @@ export default function MainGame() {
     const newBot = result.bot
     dispatch(updateBot(newBot))
 
-    // Check node collection
+    // Wall hit feedback
+    if (result.collision && result.hitType === 'wall') {
+      triggerShake()
+    }
+
     const newlyCollected = checkNodeCollection(newBot, levelData.dataNodes, currentCollected)
     newlyCollected.forEach(id => dispatch(collectNode(id)))
     const allCollected = [...currentCollected, ...newlyCollected]
 
-    // Move enemies every 2 steps
     enemyTickRef.current += 1
     let newEnemies = currentEnemies
     if (enemyTickRef.current % 2 === 0) {
@@ -55,16 +69,15 @@ export default function MainGame() {
       dispatch(updateEnemies(newEnemies))
     }
 
-    // Check enemy collision
     const caught = newEnemies.some(e => e.x === newBot.x && e.y === newBot.y)
     if (caught) {
-      dispatch(addLog({ type: 'error', msg: `> FATAL: ENEMY_COLLISION at [${newBot.x},${newBot.y}]` }))
-      dispatch(addLog({ type: 'error', msg: `> STACK: No evasion logic at step ${step + 1}` }))
+      dispatch(addLog({ type: 'error', msg: `> FATAL: ENEMY_COLLISION — bot destroyed at [${newBot.x},${newBot.y}]` }))
+      dispatch(addLog({ type: 'error', msg: `> STACK TRACE: Entity contact at step ${step}. No evasion logic found.` }))
+      triggerShake()
       dispatch(setGameOver('lost'))
       return
     }
 
-    // Check win
     if (checkWinCondition(newBot, levelData, allCollected)) {
       dispatch(addLog({ type: 'success', msg: `> WIN_CONDITION_MET — all nodes collected, exit reached!` }))
       dispatch(setGameOver('won'))
@@ -74,15 +87,15 @@ export default function MainGame() {
     executionRef.current = setTimeout(() => {
       runNextStep(currentBlocks, newBot, newEnemies, allCollected, step + 1)
     }, 380)
-  }, [dispatch, levelData])
+  }, [dispatch, levelData, triggerShake])
 
   const handleRun = useCallback(() => {
     if (blocks.length === 0) {
-      dispatch(addLog({ type: 'error', msg: '> ERROR: No program loaded.' }))
+      dispatch(addLog({ type: 'error', msg: '> ERROR: No program loaded. Add blocks to Logic Deck.' }))
       return
     }
     dispatch(setStatus('running'))
-    dispatch(addLog({ type: 'system', msg: `> EXECUTING [${blocks.length} ops]` }))
+    dispatch(addLog({ type: 'system', msg: `> EXECUTING program [${blocks.length} opcodes]` }))
     stepRef.current = 0
     enemyTickRef.current = 0
     runNextStep(blocks, bot, enemies, collectedNodes, 0)
@@ -90,7 +103,7 @@ export default function MainGame() {
 
   const handleStop = useCallback(() => {
     stopExecution()
-    dispatch(addLog({ type: 'warn', msg: '> HALTED' }))
+    dispatch(addLog({ type: 'warn', msg: '> EXECUTION_HALTED by operator' }))
   }, [stopExecution, dispatch])
 
   const handleReset = useCallback(() => {
@@ -105,64 +118,51 @@ export default function MainGame() {
     dispatch(clearProgram())
   }, [stopExecution, dispatch])
 
-  // Resume from pause
-  useEffect(() => {
-    if (status === 'running' && pausedStateRef.current.step > 0) {
-      pausedStateRef.current = { bot: null, enemies: null, collectedNodes: null, step: 0 }
-    }
-  }, [status])
-
   useEffect(() => () => { if (executionRef.current) clearTimeout(executionRef.current) }, [])
 
   return (
-    <div style={{
+    <div ref={containerRef} style={{
       width: '100vw', height: '100vh',
       display: 'grid',
       gridTemplateRows: 'auto 1fr auto',
       gridTemplateColumns: '1fr',
       background: '#000',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      transition: 'all 0.05s'
     }}>
       <HUD onRun={handleRun} onStop={handleStop} onReset={handleReset} onNext={handleNext} />
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(300px, 1fr) minmax(250px, 320px)',
-        gridTemplateRows: '1fr minmax(140px, 200px)',
+        gridTemplateColumns: '1fr 320px',
+        gridTemplateRows: '1fr 180px',
         gap: 2,
         padding: '2px',
         height: '100%',
-        overflow: 'hidden',
-        '@media (max-width: 768px)': {
-          gridTemplateColumns: '1fr',
-          gridTemplateRows: '1fr auto auto'
-        }
+        overflow: 'hidden'
       }}>
-        {/* Viewport */}
         <div style={{ gridRow: '1 / 3', overflow: 'hidden' }}>
           <Viewport />
         </div>
 
-        {/* Logic Deck */}
         <div style={{ overflow: 'hidden' }}>
           <LogicDeck />
         </div>
 
-        {/* Console */}
         <div style={{ overflow: 'hidden' }}>
           <ConsolePanel />
         </div>
       </div>
 
-      {/* Game over overlay */}
       {(status === 'won' || status === 'lost') && (
         <div style={{
           position: 'fixed', inset: 0, background: '#00000099',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000, flexDirection: 'column', gap: 24
+          zIndex: 1000, flexDirection: 'column', gap: 24,
+          animation: 'popIn 0.5s ease'
         }}>
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 8vw, 72px)',
+            fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 6vw, 72px)',
             color: status === 'won' ? '#00ff41' : '#ff0040',
             textShadow: `0 0 40px ${status === 'won' ? '#00ff41' : '#ff0040'}`,
             letterSpacing: 8,
@@ -175,7 +175,7 @@ export default function MainGame() {
               SCORE: {score} pts
             </div>
           )}
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: 16 }}>
             <button onClick={handleReset}>RETRY</button>
             {status === 'won' && currentLevel < 4 && (
               <button onClick={handleNext} style={{ borderColor: '#00ff41', color: '#00ff41' }}>NEXT LEVEL</button>

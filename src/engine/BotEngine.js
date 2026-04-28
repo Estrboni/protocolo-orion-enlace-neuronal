@@ -7,16 +7,12 @@ const DIRS = [
   { x: -1, y: 0 }, // 3 = LEFT
 ]
 
-function distanceTo(x1, y1, x2, y2) {
-  return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2))
-}
-
 export function executeStep(block, bot, grid, enemies, dataNodes, collectedNodes, params = {}) {
   const logs = []
   let newBot = { ...bot }
   let sensorTriggered = false
-  let nearestEnemyDist = Infinity
-  let sensedEnemyCount = 0
+  let collision = false
+  let hitType = null // 'wall', 'gate', 'enemy'
 
   switch (block.type) {
     case 'MOVE': {
@@ -26,15 +22,19 @@ export function executeStep(block, bot, grid, enemies, dataNodes, collectedNodes
         const nx = newBot.x + dir.x
         const ny = newBot.y + dir.y
         const cellType = grid[ny]?.[nx]
+        
         if (cellType === 1) {
-          logs.push({ type: 'error', msg: `> COLLISION at [${nx},${ny}] — WALL_COLLISION_EXCEPTION` })
-          return { bot: newBot, logs, collision: true, sensorTriggered, sensedEnemyCount }
+          logs.push({ type: 'error', msg: `> COLLISION at [${nx},${ny}] — WALL_COLLISION_EXCEPTION`, highlight: true })
+          collision = true
+          hitType = 'wall'
+          break
         }
+        
         // Logic gate check
         if (cellType >= 5 && cellType <= 8) {
           logs.push({ type: 'warn', msg: `> GATE_${['AND','OR','NOT','XOR'][cellType-5]} at [${nx},${ny}] — requires gate block` })
         }
-        // Energy calculation: E = v^2 * t (v=1 unit/step, t=1)
+        
         newBot.energy = Math.max(0, newBot.energy - 1)
         newBot.x = nx
         newBot.y = ny
@@ -52,20 +52,11 @@ export function executeStep(block, bot, grid, enemies, dataNodes, collectedNodes
     case 'IF_SENSOR': {
       const range = block.params.range ?? 3
       const nearby = enemies.filter(e => {
-        const dist = distanceTo(newBot.x, newBot.y, e.x, e.y)
-        if (dist <= range) {
-          sensedEnemyCount++
-          if (dist < nearestEnemyDist) nearestEnemyDist = dist
-          return true
-        }
-        return false
+        const dist = Math.sqrt(Math.pow(e.x - newBot.x, 2) + Math.pow(e.y - newBot.y, 2))
+        return dist <= range
       })
       sensorTriggered = nearby.length > 0
-      if (sensorTriggered) {
-        logs.push({ type: 'warn', msg: `> IF_SENSOR range=${range} → THREAT_DETECTED [${sensedEnemyCount}] nearest=${nearestEnemyDist.toFixed(1)}` })
-      } else {
-        logs.push({ type: 'info', msg: `> IF_SENSOR range=${range} → CLEAR` })
-      }
+      logs.push({ type: sensorTriggered ? 'warn' : 'info', msg: `> IF_SENSOR range=${range} → ${sensorTriggered ? `THREAT_DETECTED [${nearby.length}]` : 'CLEAR'}`, highlight: sensorTriggered })
       break
     }
     case 'LOOP_UNTIL': {
@@ -73,30 +64,23 @@ export function executeStep(block, bot, grid, enemies, dataNodes, collectedNodes
       break
     }
     case 'AND_GATE': {
-      const a = block.params.a ?? 1
-      const b = block.params.b ?? 1
-      const result = a & b
-      logs.push({ type: 'info', msg: `> AND_GATE: A=${a} B=${b} → ${result}` })
+      const result = (block.params.a ?? 1) & (block.params.b ?? 1)
+      logs.push({ type: 'info', msg: `> AND_GATE: A=${block.params.a ?? 1} B=${block.params.b ?? 1} → ${result}` })
       break
     }
     case 'OR_GATE': {
-      const a = block.params.a ?? 1
-      const b = block.params.b ?? 0
-      const result = a | b
-      logs.push({ type: 'info', msg: `> OR_GATE: A=${a} B=${b} → ${result}` })
+      const result = (block.params.a ?? 1) | (block.params.b ?? 0)
+      logs.push({ type: 'info', msg: `> OR_GATE: A=${block.params.a ?? 1} B=${block.params.b ?? 0} → ${result}` })
       break
     }
     case 'NOT_GATE': {
-      const a = block.params.a ?? 1
-      const result = a ? 0 : 1
-      logs.push({ type: 'info', msg: `> NOT_GATE: A=${a} → ${result}` })
+      const result = block.params.a ?? 1 ? 0 : 1
+      logs.push({ type: 'info', msg: `> NOT_GATE: A=${block.params.a ?? 1} → ${result}` })
       break
     }
     case 'XOR_GATE': {
-      const a = block.params.a ?? 1
-      const b = block.params.b ?? 1
-      const result = a ^ b
-      logs.push({ type: 'info', msg: `> XOR_GATE: A=${a} B=${b} → ${result}` })
+      const result = (block.params.a ?? 1) ^ (block.params.b ?? 1)
+      logs.push({ type: 'info', msg: `> XOR_GATE: A=${block.params.a ?? 1} B=${block.params.b ?? 1} → ${result}` })
       break
     }
     case 'RECURSE': {
@@ -111,7 +95,7 @@ export function executeStep(block, bot, grid, enemies, dataNodes, collectedNodes
       logs.push({ type: 'error', msg: `> UNKNOWN_OPCODE: ${block.type}` })
   }
 
-  return { bot: newBot, logs, collision: false, sensorTriggered, sensedEnemyCount, nearestEnemyDist }
+  return { bot: newBot, logs, collision, sensorTriggered, hitType }
 }
 
 export function checkWinCondition(bot, levelData, collectedNodes) {

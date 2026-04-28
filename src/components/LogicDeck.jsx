@@ -27,27 +27,26 @@ function PaletteBlock({ block }) {
     <div ref={drag} style={{
       border: `1px solid ${block.color}33`,
       background: `${block.color}11`,
-      padding: '4px 8px',
+      padding: '3px 6px',
       cursor: 'grab',
       opacity: isDragging ? 0.4 : 1,
       display: 'flex',
       alignItems: 'center',
       gap: 6,
-      transition: 'all 0.15s',
-      fontSize: 'clamp(7px, 1.2vw, 9px)',
-      minHeight: '32px',
-      userSelect: 'none',
+      transition: 'all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1)',
+      fontSize: 9,
+      borderRadius: 2,
     }}
-      onMouseEnter={e => { e.currentTarget.style.background = `${block.color}22`; e.currentTarget.style.borderColor = block.color }}
-      onMouseLeave={e => { e.currentTarget.style.background = `${block.color}11`; e.currentTarget.style.borderColor = `${block.color}33` }}
+      onMouseEnter={e => { e.currentTarget.style.background = `${block.color}22`; e.currentTarget.style.borderColor = block.color; e.currentTarget.style.transform = 'translateY(-2px)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = `${block.color}11`; e.currentTarget.style.borderColor = `${block.color}33`; e.currentTarget.style.transform = 'translateY(0)' }}
     >
-      <span style={{ color: block.color, fontWeight: 'bold', fontSize: 'clamp(7px, 1.2vw, 9px)' }}>{block.type}</span>
-      <span style={{ color: '#004400', fontSize: 'clamp(6px, 1vw, 8px)' }}>{BLOCK_COSTS_MAP[block.type]}KB</span>
+      <span style={{ color: block.color, fontWeight: 'bold', fontSize: 9 }}>{block.type}</span>
+      <span style={{ color: '#004400', fontSize: 8 }}>{BLOCK_COSTS_MAP[block.type]}KB</span>
     </div>
   )
 }
 
-function ProgramBlock({ block, index }) {
+function ProgramBlock({ block, index, total }) {
   const dispatch = useDispatch()
   const ref = useRef(null)
 
@@ -81,41 +80,51 @@ function ProgramBlock({ block, index }) {
       gap: 6,
       transition: 'all 0.1s',
       marginBottom: 1,
-      fontSize: 'clamp(7px, 1.2vw, 9px)',
-      minHeight: '32px',
-      userSelect: 'none',
+      fontSize: 9,
+      borderRadius: 2,
+      className: 'program-block',
+      animation: `blockSlideIn 0.3s ease backwards`,
+      animationDelay: `${index * 40}ms`,
     }}>
-      <span style={{ color: '#003300', fontSize: 'clamp(6px, 1vw, 8px)' }}>{String(index + 1).padStart(2, '0')}</span>
-      <span style={{ color: blockColor, fontWeight: 'bold', minWidth: 60, fontSize: 'clamp(7px, 1.2vw, 9px)' }}>{block.type}</span>
+      <span style={{ color: '#003300', fontSize: 8 }}>{String(index + 1).padStart(2, '0')}</span>
+      <span style={{ color: blockColor, fontWeight: 'bold', minWidth: 70, fontSize: 9 }}>{block.type}</span>
 
-      {/* Params */}
       {block.type === 'MOVE' && (
         <input type="number" min="1" max="10" value={block.params.steps ?? 1}
           onChange={e => dispatch(updateBlockParam({ id: block.id, key: 'steps', value: parseInt(e.target.value) }))}
-          style={{ width: 32, background: '#000', border: '1px solid #003300', color: '#00ff41', fontSize: 'clamp(6px, 1vw, 8px)', textAlign: 'center', fontFamily: 'var(--font-mono)' }} />
+          style={{ width: 32, background: '#000', border: '1px solid #003300', color: '#00ff41', fontSize: 9, textAlign: 'center', fontFamily: 'var(--font-mono)', borderRadius: 2 }} />
       )}
       {block.type === 'ROTATE' && (
         <select value={block.params.direction ?? 'right'}
           onChange={e => dispatch(updateBlockParam({ id: block.id, key: 'direction', value: e.target.value }))}
-          style={{ background: '#000', border: '1px solid #003300', color: '#00d4ff', fontSize: 'clamp(6px, 1vw, 8px)', fontFamily: 'var(--font-mono)' }}>
-          <option value="right">R</option>
-          <option value="left">L</option>
+          style={{ background: '#000', border: '1px solid #003300', color: '#00d4ff', fontSize: 9, fontFamily: 'var(--font-mono)', borderRadius: 2 }}>
+          <option value="right">RIGHT</option>
+          <option value="left">LEFT</option>
         </select>
       )}
       {block.type === 'IF_SENSOR' && (
         <input type="number" min="1" max="6" value={block.params.range ?? 3}
           onChange={e => dispatch(updateBlockParam({ id: block.id, key: 'range', value: parseInt(e.target.value) }))}
-          style={{ width: 28, background: '#000', border: '1px solid #003300', color: '#ffb000', fontSize: 'clamp(6px, 1vw, 8px)', textAlign: 'center', fontFamily: 'var(--font-mono)' }} />
+          style={{ width: 32, background: '#000', border: '1px solid #003300', color: '#ffb000', fontSize: 9, textAlign: 'center', fontFamily: 'var(--font-mono)', borderRadius: 2 }} />
+      )}
+      {block.type === 'LOOP_UNTIL' && (
+        <select value={block.params.condition ?? 'EXIT'}
+          onChange={e => dispatch(updateBlockParam({ id: block.id, key: 'condition', value: e.target.value }))}
+          style={{ background: '#000', border: '1px solid #003300', color: '#bf00ff', fontSize: 9, fontFamily: 'var(--font-mono)', borderRadius: 2 }}>
+          <option value="EXIT">EXIT_REACHED</option>
+          <option value="ALL_NODES">ALL_NODES</option>
+          <option value="NO_ENEMIES">NO_ENEMIES</option>
+        </select>
       )}
       {block.type === 'WAIT' && (
         <input type="number" min="1" max="5" value={block.params.ticks ?? 1}
           onChange={e => dispatch(updateBlockParam({ id: block.id, key: 'ticks', value: parseInt(e.target.value) }))}
-          style={{ width: 28, background: '#000', border: '1px solid #003300', color: '#006622', fontSize: 'clamp(6px, 1vw, 8px)', textAlign: 'center', fontFamily: 'var(--font-mono)' }} />
+          style={{ width: 32, background: '#000', border: '1px solid #003300', color: '#006622', fontSize: 9, textAlign: 'center', fontFamily: 'var(--font-mono)', borderRadius: 2 }} />
       )}
 
-      <span style={{ marginLeft: 'auto', color: '#003300', fontSize: 'clamp(6px, 1vw, 8px)' }}>{block.cost}KB</span>
+      <span style={{ marginLeft: 'auto', color: '#003300', fontSize: 8 }}>{block.cost}KB</span>
       <button onClick={() => dispatch(removeBlock(block.id))}
-        style={{ border: 'none', background: 'none', color: '#ff004066', cursor: 'pointer', fontSize: 'clamp(8px, 1.2vw, 11px)', padding: '0 2px', lineHeight: 1, minWidth: '20px' }}
+        style={{ border: 'none', background: 'none', color: '#ff004066', cursor: 'pointer', fontSize: 10, padding: '0 2px', lineHeight: 1, transition: 'all 0.15s' }}
         onMouseEnter={e => e.currentTarget.style.color = '#ff0040'}
         onMouseLeave={e => e.currentTarget.style.color = '#ff004066'}
       >✕</button>
@@ -134,19 +143,19 @@ function DropZone() {
   return (
     <div ref={drop} style={{
       flex: 1,
-      minHeight: 44,
+      minHeight: 40,
       border: isOver ? '1px dashed #00ff41' : '1px dashed #002200',
       background: isOver ? '#00ff4108' : 'transparent',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       color: '#003300',
-      fontSize: 'clamp(7px, 1.2vw, 9px)',
+      fontSize: 9,
       letterSpacing: 2,
       transition: 'all 0.15s',
-      cursor: 'pointer'
+      borderRadius: 2
     }}>
-      {isOver ? '+ DROP' : '— DROP HERE —'}
+      {isOver ? '+ DROP BLOCK' : '— DRAG BLOCKS —'}
     </div>
   )
 }
@@ -160,43 +169,32 @@ export default function LogicDeck() {
   const overflow = memUsed > memTotal
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#050f05', border: '1px solid #003300', overflow: 'hidden' }}>
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '4px 10px',
-        fontSize: 'clamp(7px, 1.2vw, 9px)',
-        letterSpacing: 3,
-        color: '#006622',
-        borderBottom: '1px solid #003300',
-        textTransform: 'uppercase'
-      }}>
-        <span>▶ LOGIC DECK</span>
-        <span style={{ color: overflow ? '#ff0040' : '#006622' }}>
-          {memUsed}/{memTotal}KB {overflow && '⚠'}
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#050f05', border: '1px solid #003300', overflow: 'hidden', borderRadius: 2 }}>
+      <div className="panel-header" style={{ fontSize: 9 }}>
+        LOGIC DECK
+        <span style={{ marginLeft: 'auto', color: overflow ? '#ff0040' : '#006622' }}>
+          {memUsed}/{memTotal}KB {overflow && '⚠ OVERFLOW'}
         </span>
       </div>
 
-      {/* Palette */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, padding: 4, borderBottom: '1px solid #002200' }}>
         {BLOCK_PALETTE.map(b => <PaletteBlock key={b.type} block={b} />)}
       </div>
 
-      {/* Program */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 4 }}>
         {blocks.length === 0 ? (
           <DropZone />
         ) : (
           <>
-            {blocks.map((b, i) => <ProgramBlock key={b.id} block={b} index={i} />)}
+            {blocks.map((b, i) => <ProgramBlock key={b.id} block={b} index={i} total={blocks.length} />)}
             <DropZone />
           </>
         )}
       </div>
 
-      {/* Footer */}
-      <div style={{ padding: '4px 8px', borderTop: '1px solid #002200', display: 'flex', gap: 6, alignItems: 'center', fontSize: 'clamp(7px, 1.2vw, 9px)' }}>
-        <span style={{ color: '#003300', flex: 1 }}>{blocks.length} ops</span>
-        <button onClick={() => dispatch(clearProgram())} className="danger" style={{ fontSize: 'clamp(7px, 1.2vw, 9px)', padding: '2px 8px' }}>CLR</button>
+      <div style={{ padding: '4px 8px', borderTop: '1px solid #002200', display: 'flex', gap: 6, alignItems: 'center' }}>
+        <span style={{ color: '#003300', fontSize: 9, flex: 1 }}>{blocks.length} opcodes</span>
+        <button onClick={() => dispatch(clearProgram())} className="danger" style={{ fontSize: 8, padding: '2px 8px' }}>CLR</button>
       </div>
     </div>
   )
