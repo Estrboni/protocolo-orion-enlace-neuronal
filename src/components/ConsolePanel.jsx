@@ -9,124 +9,55 @@ const TYPE_COLORS = {
   success: '#00ff41',
 }
 
-const TYPE_ICONS = {
-  system: '▶',
-  info: '◆',
-  warn: '⚠',
-  error: '✕',
-  success: '✓',
-}
-
 export default function ConsolePanel() {
-  const { consoleLog, currentLevel, levelData } = useSelector(s => s.game)
+  const { consoleLog, currentLevel, levelData, collectedNodes, bot } = useSelector(s => s.game)
+  const { blocks } = useSelector(s => s.program)
   const bottomRef = useRef(null)
   const containerRef = useRef(null)
 
   useEffect(() => {
-    // Only auto-scroll if user is at bottom
     if (containerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = containerRef.current
-      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50
-      if (isAtBottom) {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-      }
+      containerRef.current.scrollTop = containerRef.current.scrollHeight
     }
   }, [consoleLog])
 
+  const errorCount = consoleLog.filter(e => e.type === 'error').length
+  const successCount = consoleLog.filter(e => e.type === 'success').length
+
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      background: '#020a02',
-      border: '1px solid #002200',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden'
-    }}
-      role="region"
-      aria-label="System console output"
-      aria-live="polite">
-      <div className="panel-header" style={{ fontSize: '9px' }}>
-        SYSTEM CONSOLE
-        <span style={{ marginLeft: 'auto', color: '#003300', fontSize: '8px' }}>
-          LVL {currentLevel + 1} — {consoleLog.length} msgs
-        </span>
+    <div style={{ width: '100%', height: '100%', background: '#020a02', border: '1px solid #002200', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="panel-header" style={{ fontSize: 8 }}>
+        CONSOLE {errorCount > 0 && <span style={{ color: '#ff0040', marginLeft: 8 }}>⚠ {errorCount} errors</span>}
+        {successCount > 0 && <span style={{ color: '#00ff41', marginLeft: 8 }}>✓ {successCount} success</span>}
       </div>
 
-      {/* Hint */}
       {levelData?.hint && (
-        <div style={{
-          padding: '3px 8px',
-          background: '#001a00',
-          borderBottom: '1px solid #002200',
-          color: '#ffb000',
-          fontSize: '9px',
-          letterSpacing: 1,
-          lineHeight: 1.4,
-          animation: 'fadeInUp 0.4s ease'
-        }}
-          role="note">
-          ⚡ {levelData.hint}
+        <div style={{ padding: '3px 8px', background: '#001a00', borderBottom: '1px solid #002200', color: '#ffb000', fontSize: 8, letterSpacing: 1, lineHeight: 1.4 }}>
+          💡 {levelData.hint}
         </div>
       )}
 
-      {/* Log */}
-      <div ref={containerRef} style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '4px 8px',
-        fontFamily: 'var(--font-mono)',
-        fontSize: '9px',
-        scrollBehavior: 'smooth'
-      }}>
-        {consoleLog.length === 0 ? (
-          <div style={{ color: '#003300', textAlign: 'center', marginTop: '20px' }}>
-            [awaiting system events]
+      <div ref={containerRef} style={{ flex: 1, overflowY: 'auto', padding: '4px 8px', fontFamily: 'var(--font-mono)', fontSize: 8, lineHeight: 1.6 }}>
+        {consoleLog.map((entry, i) => (
+          <div key={i} style={{
+            color: TYPE_COLORS[entry.type] ?? '#004400',
+            animation: i === consoleLog.length - 1 ? 'fadeInUp 0.2s ease' : 'none',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word'
+          }}>
+            <span style={{ color: '#002200', marginRight: 3, fontWeight: 'bold' }}>[{String(i).padStart(3, '0')}]</span>
+            {entry.msg}
           </div>
-        ) : (
-          consoleLog.map((entry, i) => (
-            <div key={i} style={{
-              color: TYPE_COLORS[entry.type] ?? '#004400',
-              lineHeight: 1.6,
-              animation: i === consoleLog.length - 1 ? 'fadeInUp 0.2s ease' : 'none',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-all',
-              display: 'flex',
-              gap: 4,
-            }}
-              role={entry.type === 'error' ? 'alert' : undefined}
-              aria-live={entry.type === 'error' || entry.type === 'success' ? 'assertive' : undefined}>
-              <span style={{
-                color: '#003300',
-                minWidth: 30,
-                fontSize: '8px',
-                userSelect: 'none',
-                flexShrink: 0
-              }}>
-                {TYPE_ICONS[entry.type] || '·'} {String(i).padStart(3, '0')}
-              </span>
-              <span style={{ flex: 1 }}>
-                {entry.msg}
-              </span>
-            </div>
-          ))
-        )}
-        <div ref={bottomRef} style={{ height: 1 }} aria-hidden="true" />
+        ))}
+        <div ref={bottomRef} />
       </div>
 
-      {/* Status footer */}
-      {consoleLog.length > 50 && (
-        <div style={{
-          padding: '2px 8px',
-          borderTop: '1px solid #002200',
-          color: '#003300',
-          fontSize: '8px',
-          letterSpacing: 1,
-          textAlign: 'right'
-        }}>
-          showing last {Math.min(consoleLog.length, 80)} of {consoleLog.length} messages
-        </div>
-      )}
+      {/* Stats footer */}
+      <div style={{ padding: '4px 8px', borderTop: '1px solid #002200', display: 'flex', gap: 12, fontSize: 7, color: '#003300', flexWrap: 'wrap' }}>
+        <span>POS: <span style={{ color: '#00d4ff' }}>[{bot.x},{bot.y}]</span></span>
+        <span>PROG: <span style={{ color: '#00ff41' }}>{blocks.length}</span></span>
+        <span>NODES: <span style={{ color: '#00ff41' }}>{collectedNodes.length}/{levelData?.dataNodes?.length ?? 0}</span></span>
+      </div>
     </div>
   )
 }
