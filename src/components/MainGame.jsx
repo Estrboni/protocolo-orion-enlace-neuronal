@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react'
+import React, { useEffect, useRef, useCallback, useMemo } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { resetLevel, nextLevel, addLog, updateBot, updateEnemies, collectNode, setGameOver, setStatus } from '../store/gameSlice'
 import { setExecutionStep } from '../store/gameSlice'
@@ -10,6 +10,12 @@ import { executeStep, checkWinCondition, checkNodeCollection } from '../engine/B
 import { moveEnemyToward } from '../engine/AStarEnemy'
 import { clearProgram } from '../store/programSlice'
 
+// Memoized child components for performance
+const MemoViewport = React.memo(Viewport)
+const MemoLogicDeck = React.memo(LogicDeck)
+const MemoConsolePanel = React.memo(ConsolePanel)
+const MemoHUD = React.memo(HUD)
+
 export default function MainGame() {
   const dispatch = useDispatch()
   const { status, bot, enemies, levelData, collectedNodes, currentLevel, score } = useSelector(s => s.game)
@@ -17,7 +23,6 @@ export default function MainGame() {
   const executionRef = useRef(null)
   const stepRef = useRef(0)
   const enemyTickRef = useRef(0)
-  const feedbackRef = useRef({ showNodeCollect: false, nodeId: null })
 
   const stopExecution = useCallback(() => {
     if (executionRef.current) { clearTimeout(executionRef.current); executionRef.current = null }
@@ -44,12 +49,7 @@ export default function MainGame() {
 
     // Check node collection
     const newlyCollected = checkNodeCollection(newBot, levelData.dataNodes, currentCollected)
-    newlyCollected.forEach(id => {
-      dispatch(collectNode(id))
-      feedbackRef.current.showNodeCollect = true
-      feedbackRef.current.nodeId = id
-      setTimeout(() => { feedbackRef.current.showNodeCollect = false }, 600)
-    })
+    newlyCollected.forEach(id => dispatch(collectNode(id)))
     const allCollected = [...currentCollected, ...newlyCollected]
 
     // Move enemies every 2 steps
@@ -76,9 +76,11 @@ export default function MainGame() {
       return
     }
 
+    // Adaptive step timing based on execution step (faster at end)
+    const stepTiming = Math.max(120, 380 - step * 2)
     executionRef.current = setTimeout(() => {
       runNextStep(currentBlocks, newBot, newEnemies, allCollected, step + 1)
-    }, 380)
+    }, stepTiming)
   }, [dispatch, levelData])
 
   const handleRun = useCallback(() => {
@@ -110,12 +112,25 @@ export default function MainGame() {
     dispatch(clearProgram())
   }, [stopExecution, dispatch])
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    function handleKey(e) {
+      if (e.code === 'Space' && status !== 'running') { handleRun(); e.preventDefault() }
+      if (e.code === 'Escape') { handleStop(); e.preventDefault() }
+      if (e.code === 'KeyR') { handleReset(); e.preventDefault() }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [status, handleRun, handleStop, handleReset])
+
   useEffect(() => () => { if (executionRef.current) clearTimeout(executionRef.current) }, [])
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+  const isGameOver = status === 'won' || status === 'lost'
+  const gameOverColor = status === 'won' ? '#00ff41' : '#ff0040'
+  const gameOverText = status === 'won' ? '✓ LEVEL COMPLETE' : '✗ SYSTEM FAILURE'
 
   return (
-    <div style={{
+    <div role="main" aria-label="Protocolo Orión Game" style={{
       width: '100vw', height: '100vh',
       display: 'grid',
       gridTemplateRows: 'auto 1fr auto',
@@ -123,77 +138,59 @@ export default function MainGame() {
       background: '#000',
       overflow: 'hidden'
     }}>
-      <HUD onRun={handleRun} onStop={handleStop} onReset={handleReset} onNext={handleNext} />
+      <MemoHUD onRun={handleRun} onStop={handleStop} onReset={handleReset} onNext={handleNext} />
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : '1fr 320px',
-        gridTemplateRows: isMobile ? '1fr auto auto' : '1fr 180px',
+        gridTemplateColumns: '1fr 320px',
+        gridTemplateRows: '1fr 180px',
         gap: 2,
         padding: '2px',
         height: '100%',
         overflow: 'hidden'
       }}>
-        {/* Viewport */}
-        <div style={{ gridRow: isMobile ? '1' : '1 / 3', overflow: 'hidden' }}>
-          <Viewport />
+        <div style={{ gridRow: '1 / 3', overflow: 'hidden' }}>
+          <MemoViewport />
         </div>
-
-        {/* Logic Deck */}
-        <div style={{ 
-          overflow: 'hidden',
-          minHeight: isMobile ? '140px' : 'auto'
-        }}>
-          <LogicDeck />
+        <div style={{ overflow: 'hidden' }}>
+          <MemoLogicDeck />
         </div>
-
-        {/* Console */}
-        <div style={{ overflow: 'hidden', minHeight: isMobile ? '120px' : 'auto' }}>
-          <ConsolePanel />
+        <div style={{ overflow: 'hidden' }}>
+          <MemoConsolePanel />
         </div>
       </div>
 
-      {/* Game over overlay — enhanced */}
-      {(status === 'won' || status === 'lost') && (
-        <div style={{
-          position: 'fixed', inset: 0, background: '#00000099',
+      {isGameOver && (
+        <div role="dialog" aria-label={gameOverText} style={{
+          position: 'fixed', inset: 0,
+          background: 'linear-gradient(135deg, #00000099 0%, #1a001a99 100%)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 1000, flexDirection: 'column', gap: 24,
-          backdropFilter: 'blur(3px)'
+          animation: 'fadeInUp 0.4s ease-out',
+          backdropFilter: 'blur(2px)',
         }}>
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 6vw, 72px)',
-            color: status === 'won' ? '#00ff41' : '#ff0040',
-            textShadow: `0 0 40px ${status === 'won' ? '#00ff41' : '#ff0040'}, 0 0 80px ${status === 'won' ? '#00ff4155' : '#ff004055'}`,
+            fontFamily: 'var(--font-display)',
+            fontSize: 'clamp(32px, 8vw, 72px)',
+            color: gameOverColor,
+            textShadow: `0 0 40px ${gameOverColor}, 0 0 80px ${gameOverColor}33`,
             letterSpacing: 8,
-            animation: 'glitch 0.5s infinite',
-            marginTop: -32
+            animation: 'glitch 0.6s infinite alternate',
+            fontWeight: 'bold',
           }}>
-            {status === 'won' ? '✓ LEVEL COMPLETE' : '✗ SYSTEM FAILURE'}
+            {gameOverText}
           </div>
-          
+
           {status === 'won' && (
-            <div style={{ 
-              color: '#ffb000', fontFamily: 'var(--font-mono)', fontSize: 14, letterSpacing: 4,
-              textShadow: '0 0 20px #ffb000'
-            }}>
+            <div style={{ color: '#ffb000', fontFamily: 'var(--font-mono)', fontSize: 14, letterSpacing: 4, animation: 'pulse-green 2s infinite' }}>
               SCORE: {score} pts
             </div>
           )}
 
-          {status === 'lost' && (
-            <div style={{ 
-              color: '#ff0040', fontFamily: 'var(--font-mono)', fontSize: 12, 
-              textAlign: 'center', opacity: 0.8, maxWidth: 300
-            }}>
-              Program execution failed. Check logic and retry.
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button onClick={handleReset} style={{ fontSize: 10, padding: '8px 16px' }}>RETRY</button>
+          <div style={{ display: 'flex', gap: 16 }}>
+            <button onClick={handleReset} style={{ fontSize: 10, padding: '4px 12px', borderColor: '#ffb000', color: '#ffb000' }}>↺ RETRY</button>
             {status === 'won' && currentLevel < 4 && (
-              <button onClick={handleNext} style={{ fontSize: 10, padding: '8px 16px', borderColor: '#00ff41', color: '#00ff41' }}>NEXT LEVEL</button>
+              <button onClick={handleNext} style={{ fontSize: 10, padding: '4px 12px', borderColor: '#00ff41', color: '#00ff41' }}>▶ NEXT</button>
             )}
           </div>
         </div>

@@ -1,11 +1,12 @@
 {
   "name": "protocolo-orion-enlace-neuronal",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Protocolo Orion: Enlace Neuronal — Cyber-Terminal logic programming game",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "optimize": "npx terser dist/assets/*.js -c -m -o /dev/null"
   },
   "dependencies": {
     "react": "^18.2.0",
