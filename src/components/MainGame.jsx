@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react'
+import React, { useEffect, useRef, useCallback } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
-import { resetLevel, nextLevel, addLog, updateBot, updateEnemies, collectNode, setGameOver, setStatus } from '../store/gameSlice'
+import { resetLevel, nextLevel, addLog, updateBot, updateEnemies, collectNode, setGameOver, setStatus, setExecutionTime, setExecutionStartTime } from '../store/gameSlice'
 import { setExecutionStep } from '../store/gameSlice'
 import Viewport from './Viewport'
 import LogicDeck from './LogicDeck'
@@ -12,9 +12,8 @@ import { clearProgram } from '../store/programSlice'
 
 export default function MainGame() {
   const dispatch = useDispatch()
-  const { status, bot, enemies, levelData, collectedNodes, currentLevel, score } = useSelector(s => s.game)
+  const { status, bot, enemies, levelData, collectedNodes, currentLevel, score, executionStartTime } = useSelector(s => s.game)
   const { blocks } = useSelector(s => s.program)
-  const [execSpeed, setExecSpeed] = useState(1) // 0.5x to 2x
   const executionRef = useRef(null)
   const stepRef = useRef(0)
   const enemyTickRef = useRef(0)
@@ -27,7 +26,9 @@ export default function MainGame() {
 
   const runNextStep = useCallback((currentBlocks, currentBot, currentEnemies, currentCollected, step) => {
     if (step >= currentBlocks.length) {
-      dispatch(addLog({ type: 'system', msg: '> PROGRAM_END — execution complete' }))
+      const elapsed = executionStartTime ? Date.now() - executionStartTime : 0
+      dispatch(setExecutionTime(elapsed))
+      dispatch(addLog({ type: 'system', msg: `> PROGRAM_END — ${step} steps, ${(elapsed/1000).toFixed(2)}s elapsed` }))
       dispatch(setStatus('idle'))
       stepRef.current = 0
       return
@@ -60,25 +61,25 @@ export default function MainGame() {
     if (caught) {
       dispatch(addLog({ type: 'error', msg: `> FATAL: ENEMY_COLLISION — bot destroyed at [${newBot.x},${newBot.y}]` }))
       dispatch(addLog({ type: 'error', msg: `> STACK TRACE: Entity contact at step ${step}. No evasion logic found.` }))
+      const elapsed = executionStartTime ? Date.now() - executionStartTime : 0
+      dispatch(setExecutionTime(elapsed))
       dispatch(setGameOver('lost'))
       return
     }
 
     // Check win
     if (checkWinCondition(newBot, levelData, allCollected)) {
-      dispatch(addLog({ type: 'success', msg: `> WIN_CONDITION_MET — all nodes collected, exit reached!` }))
+      const elapsed = executionStartTime ? Date.now() - executionStartTime : 0
+      dispatch(setExecutionTime(elapsed))
+      dispatch(addLog({ type: 'success', msg: `> WIN_CONDITION_MET — all nodes collected, exit reached! [${(elapsed/1000).toFixed(2)}s]` }))
       dispatch(setGameOver('won'))
       return
     }
 
-    // Speed scaling: 0.5x = 760ms, 1x = 380ms, 2x = 190ms
-    const baseDelay = 380
-    const delay = baseDelay / execSpeed
-
     executionRef.current = setTimeout(() => {
       runNextStep(currentBlocks, newBot, newEnemies, allCollected, step + 1)
-    }, delay)
-  }, [dispatch, levelData, execSpeed])
+    }, 380)
+  }, [dispatch, levelData, executionStartTime])
 
   const handleRun = useCallback(() => {
     if (blocks.length === 0) {
@@ -86,11 +87,12 @@ export default function MainGame() {
       return
     }
     dispatch(setStatus('running'))
-    dispatch(addLog({ type: 'system', msg: `> EXECUTING program [${blocks.length} opcodes, speed=${execSpeed.toFixed(1)}x]` }))
+    dispatch(setExecutionStartTime(Date.now()))
+    dispatch(addLog({ type: 'system', msg: `> EXECUTING program [${blocks.length} opcodes]` }))
     stepRef.current = 0
     enemyTickRef.current = 0
     runNextStep(blocks, bot, enemies, collectedNodes, 0)
-  }, [blocks, bot, enemies, collectedNodes, dispatch, runNextStep, execSpeed])
+  }, [blocks, bot, enemies, collectedNodes, dispatch, runNextStep])
 
   const handleStop = useCallback(() => {
     stopExecution()
@@ -122,26 +124,6 @@ export default function MainGame() {
     }}>
       <HUD onRun={handleRun} onStop={handleStop} onReset={handleReset} onNext={handleNext} />
 
-      {/* Speed control bar */}
-      {status === 'running' && (
-        <div style={{
-          background: '#050f05',
-          borderBottom: '1px solid #003300',
-          padding: '4px 12px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          fontSize: 9,
-          color: '#00ff41'
-        }}>
-          <span style={{ color: '#006622' }}>SPEED:</span>
-          <input type="range" min="0.5" max="2" step="0.1" value={execSpeed}
-            onChange={e => setExecSpeed(parseFloat(e.target.value))}
-            style={{ width: 120 }} />
-          <span style={{ color: '#ffb000', minWidth: 30 }}>{execSpeed.toFixed(1)}x</span>
-        </div>
-      )}
-
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 320px',
@@ -167,44 +149,28 @@ export default function MainGame() {
         </div>
       </div>
 
-      {/* Game over overlay with enhanced animations */}
+      {/* Game over overlay */}
       {(status === 'won' || status === 'lost') && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)',
+          position: 'fixed', inset: 0, background: '#00000099',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000, flexDirection: 'column', gap: 24,
-          backdropFilter: 'blur(2px)'
+          zIndex: 1000, flexDirection: 'column', gap: 24
         }}>
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 8vw, 88px)',
+            fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 6vw, 72px)',
             color: status === 'won' ? '#00ff41' : '#ff0040',
-            textShadow: `0 0 40px ${status === 'won' ? '#00ff41' : '#ff0040'}, 0 0 80px ${status === 'won' ? '#00ff4144' : '#ff004044'}`,
+            textShadow: `0 0 40px ${status === 'won' ? '#00ff41' : '#ff0040'}`,
             letterSpacing: 8,
-            animation: 'neon-flare 0.6s ease-out',
-            fontWeight: 'bold'
+            animation: 'glitch 0.5s infinite'
           }}>
             {status === 'won' ? '✓ LEVEL COMPLETE' : '✗ SYSTEM FAILURE'}
           </div>
-          
           {status === 'won' && (
-            <div style={{
-              color: '#ffb000', fontFamily: 'var(--font-mono)', fontSize: 14, letterSpacing: 4,
-              animation: 'fadeInUp 0.5s ease 0.2s both'
-            }}>
+            <div style={{ color: '#ffb000', fontFamily: 'var(--font-mono)', fontSize: 14, letterSpacing: 4 }}>
               SCORE: {score} pts
             </div>
           )}
-          
-          {status === 'lost' && (
-            <div style={{
-              color: '#ff0040', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: 2,
-              animation: 'fadeInUp 0.5s ease 0.2s both'
-            }}>
-              Entity contact. Evasion logic failed.
-            </div>
-          )}
-          
-          <div style={{ display: 'flex', gap: 16, animation: 'fadeInUp 0.5s ease 0.4s both' }}>
+          <div style={{ display: 'flex', gap: 16 }}>
             <button onClick={handleReset}>RETRY</button>
             {status === 'won' && currentLevel < 4 && (
               <button onClick={handleNext} style={{ borderColor: '#00ff41', color: '#00ff41' }}>NEXT LEVEL</button>

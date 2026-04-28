@@ -7,10 +7,16 @@ const DIRS = [
   { x: -1, y: 0 }, // 3 = LEFT
 ]
 
+function distanceTo(x1, y1, x2, y2) {
+  return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2))
+}
+
 export function executeStep(block, bot, grid, enemies, dataNodes, collectedNodes, params = {}) {
   const logs = []
   let newBot = { ...bot }
   let sensorTriggered = false
+  let nearestEnemyDist = Infinity
+  let sensedEnemyCount = 0
 
   switch (block.type) {
     case 'MOVE': {
@@ -22,7 +28,7 @@ export function executeStep(block, bot, grid, enemies, dataNodes, collectedNodes
         const cellType = grid[ny]?.[nx]
         if (cellType === 1) {
           logs.push({ type: 'error', msg: `> COLLISION at [${nx},${ny}] — WALL_COLLISION_EXCEPTION` })
-          return { bot: newBot, logs, collision: true, sensorTriggered }
+          return { bot: newBot, logs, collision: true, sensorTriggered, sensedEnemyCount }
         }
         // Logic gate check
         if (cellType >= 5 && cellType <= 8) {
@@ -46,11 +52,20 @@ export function executeStep(block, bot, grid, enemies, dataNodes, collectedNodes
     case 'IF_SENSOR': {
       const range = block.params.range ?? 3
       const nearby = enemies.filter(e => {
-        const dist = Math.sqrt(Math.pow(e.x - newBot.x, 2) + Math.pow(e.y - newBot.y, 2))
-        return dist <= range
+        const dist = distanceTo(newBot.x, newBot.y, e.x, e.y)
+        if (dist <= range) {
+          sensedEnemyCount++
+          if (dist < nearestEnemyDist) nearestEnemyDist = dist
+          return true
+        }
+        return false
       })
       sensorTriggered = nearby.length > 0
-      logs.push({ type: sensorTriggered ? 'warn' : 'info', msg: `> IF_SENSOR range=${range} → ${sensorTriggered ? `THREAT_DETECTED [${nearby.length}]` : 'CLEAR'}` })
+      if (sensorTriggered) {
+        logs.push({ type: 'warn', msg: `> IF_SENSOR range=${range} → THREAT_DETECTED [${sensedEnemyCount}] nearest=${nearestEnemyDist.toFixed(1)}` })
+      } else {
+        logs.push({ type: 'info', msg: `> IF_SENSOR range=${range} → CLEAR` })
+      }
       break
     }
     case 'LOOP_UNTIL': {
@@ -58,19 +73,30 @@ export function executeStep(block, bot, grid, enemies, dataNodes, collectedNodes
       break
     }
     case 'AND_GATE': {
-      logs.push({ type: 'info', msg: `> AND_GATE: A=${block.params.a ?? 1} B=${block.params.b ?? 1} → ${(block.params.a ?? 1) & (block.params.b ?? 1)}` })
+      const a = block.params.a ?? 1
+      const b = block.params.b ?? 1
+      const result = a & b
+      logs.push({ type: 'info', msg: `> AND_GATE: A=${a} B=${b} → ${result}` })
       break
     }
     case 'OR_GATE': {
-      logs.push({ type: 'info', msg: `> OR_GATE: A=${block.params.a ?? 1} B=${block.params.b ?? 0} → ${(block.params.a ?? 1) | (block.params.b ?? 0)}` })
+      const a = block.params.a ?? 1
+      const b = block.params.b ?? 0
+      const result = a | b
+      logs.push({ type: 'info', msg: `> OR_GATE: A=${a} B=${b} → ${result}` })
       break
     }
     case 'NOT_GATE': {
-      logs.push({ type: 'info', msg: `> NOT_GATE: A=${block.params.a ?? 1} → ${block.params.a ?? 1 ? 0 : 1}` })
+      const a = block.params.a ?? 1
+      const result = a ? 0 : 1
+      logs.push({ type: 'info', msg: `> NOT_GATE: A=${a} → ${result}` })
       break
     }
     case 'XOR_GATE': {
-      logs.push({ type: 'info', msg: `> XOR_GATE: A=${block.params.a ?? 1} B=${block.params.b ?? 1} → ${(block.params.a ?? 1) ^ (block.params.b ?? 1)}` })
+      const a = block.params.a ?? 1
+      const b = block.params.b ?? 1
+      const result = a ^ b
+      logs.push({ type: 'info', msg: `> XOR_GATE: A=${a} B=${b} → ${result}` })
       break
     }
     case 'RECURSE': {
@@ -85,7 +111,7 @@ export function executeStep(block, bot, grid, enemies, dataNodes, collectedNodes
       logs.push({ type: 'error', msg: `> UNKNOWN_OPCODE: ${block.type}` })
   }
 
-  return { bot: newBot, logs, collision: false, sensorTriggered }
+  return { bot: newBot, logs, collision: false, sensorTriggered, sensedEnemyCount, nearestEnemyDist }
 }
 
 export function checkWinCondition(bot, levelData, collectedNodes) {

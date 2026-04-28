@@ -318,3 +318,79 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
+
+/* Particle animation */
+@keyframes particleRise {
+  0% { opacity: 1; transform: translateY(0) translateX(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-40px) translateX(var(--tx)) scale(0); }
+}
+
+.particle {
+  position: fixed;
+  pointer-events: none;
+  font-size: 16px;
+  font-weight: bold;
+  will-change: transform;
+}
+
+/* Mobile-first responsive design */
+@media (max-width: 768px) {
+  :root {
+    --font-mono: 'Share Tech Mono', monospace;
+  }
+
+  body { font-size: 11px; }
+  button { font-size: 10px; padding: 4px 10px; }
+  
+  .panel { border-radius: 2px; }
+  .panel-header { padding: 3px 8px; font-size: 8px; }
+  
+  /* Stack layout vertically on mobile */
+  @supports (display: grid) {
+    [data-layout="grid"] {
+      grid-template-columns: 1fr !important;
+      grid-template-rows: auto 1fr auto auto !important;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  :root { font-size: 10px; }
+  button { font-size: 9px; padding: 3px 8px; }
+  .panel-header { font-size: 7px; padding: 2px 6px; }
+}
+
+/* Blur effect for focus */
+@keyframes focusBlur {
+  from { filter: blur(0); }
+  to { filter: blur(2px); }
+}
+
+.blur-background { animation: focusBlur 0.3s ease; }
+
+/* Threat indicator glow */
+@keyframes threatGlow {
+  0%, 100% { box-shadow: 0 0 8px #ff004466; }
+  50% { box-shadow: 0 0 16px #ff0040aa; }
+}
+
+.threat { animation: threatGlow 0.6s infinite; }
+
+/* Input focus enhancement */
+input:focus, select:focus {
+  outline: none;
+  border-color: currentColor !important;
+  box-shadow: 0 0 12px currentColor !important;
+  background-color: var(--bg-panel2);
+}
+
+/* Keyboard accessibility */
+:focus-visible {
+  outline: 2px solid var(--neon-green);
+  outline-offset: 1px;
+}
+
+button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
