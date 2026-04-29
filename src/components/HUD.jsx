@@ -1,170 +1,164 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import { BLOCK_COSTS_MAP } from '../store/programSlice'
 
 const HUD = React.memo(function HUD({ onRun, onStop, onReset, onNext }) {
   const { status, bot, currentLevel, levelData, collectedNodes, score } = useSelector(s => s.game)
   const { blocks } = useSelector(s => s.program)
+  const [prevScore, setPrevScore] = useState(score)
+  const [scoreFlash, setScoreFlash] = useState(false)
 
-  const memoryStats = useMemo(() => {
-    const used = blocks.reduce((acc, b) => acc + (BLOCK_COSTS_MAP[b.type] || 8), 0)
-    const total = levelData?.memoryBuffer ?? 128
-    return { used, total, pct: Math.min(100, (used / total) * 100), overflow: used > total }
-  }, [blocks, levelData])
+  useEffect(() => {
+    if (score !== prevScore) {
+      setScoreFlash(true)
+      setPrevScore(score)
+      setTimeout(() => setScoreFlash(false), 800)
+    }
+  }, [score, prevScore])
 
-  const energyPct = bot.energy
-  const energyColor = energyPct < 20 ? '#ff0040' : energyPct < 50 ? '#ffb000' : '#00ff41'
+  const totalNodes = levelData?.dataNodes?.length ?? 0
+  const energyPct = Math.round((bot.energy / 100) * 100)
+  const energyColor = bot.energy < 25 ? '#ff0040' : bot.energy < 50 ? '#ffb000' : '#00ff41'
 
-  const nodesTotal = levelData?.dataNodes?.length ?? 0
-  const nodesCollected = collectedNodes.length
+  const totalCost = useMemo(() =>
+    blocks.reduce((sum, b) => sum + (BLOCK_COSTS_MAP[b.type] ?? 0), 0), [blocks])
 
-  const dirNames = ['▲ N', '▶ E', '▼ S', '◀ W']
+  const running = status === 'running'
+  const idle = status === 'idle'
+  const won = status === 'won'
+  const lost = status === 'game_over'
 
   return (
     <div style={{
-      background: 'linear-gradient(180deg, #050f05 0%, #000 100%)',
-      borderBottom: '1px solid #003300',
-      padding: '6px 12px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 16,
-      flexWrap: 'wrap',
-      fontFamily: 'var(--font-mono)',
-      fontSize: 10,
-      boxShadow: '0 0 20px #00ff4108'
+      display: 'flex', flexDirection: 'column', height: '100%',
+      gap: 6, padding: '6px 8px', background: '#020902'
     }}>
-      <div style={{ color: '#00ff41', fontFamily: 'var(--font-display)', fontSize: 18, letterSpacing: 4, textShadow: '0 0 10px #00ff41', marginRight: 8 }}>
-        ORIÓN
-      </div>
 
-      <div style={{ color: '#006622', letterSpacing: 2 }}>
-        LVL <span style={{ color: '#ffb000' }}>{String(currentLevel + 1).padStart(2, '0')}</span>
-        {' '}<span style={{ color: '#004400' }}>—</span>{' '}
-        <span style={{ color: '#00ff41' }}>{levelData?.name}</span>
-      </div>
-
-      <div style={{ width: 1, height: 20, background: '#003300' }} />
-
-      {/* Memory with better styling */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#006622', fontWeight: 'bold' }}>MEM</span>
-        <div style={{ width: 100, height: 10, background: '#001100', border: '1px solid #003300', borderRadius: 3, overflow: 'hidden', boxShadow: 'inset 0 0 3px #000' }}>
-          <div style={{
-            width: `${memoryStats.pct}%`,
-            height: '100%',
-            background: memoryStats.pct > 90 ? '#ff0040' : memoryStats.pct > 70 ? '#ffb000' : '#00ff41',
-            transition: 'all 0.2s ease',
-            boxShadow: `inset 0 0 2px ${memoryStats.pct > 90 ? '#ff0040' : memoryStats.pct > 70 ? '#ffb000' : '#00ff41'}99`
-          }} />
-        </div>
-        <span style={{ color: memoryStats.overflow ? '#ff0040' : '#006622', fontWeight: memoryStats.overflow ? 'bold' : 'normal' }}>
-          {memoryStats.used}KB/{memoryStats.total}KB
+      {/* Level badge */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        borderBottom: '1px solid #003300', paddingBottom: 5
+      }}>
+        <span style={{ fontSize: 9, letterSpacing: 3, color: '#006622' }}>LEVEL</span>
+        <span style={{
+          fontFamily: "'VT323', monospace", fontSize: 22, color: '#00ff41',
+          textShadow: '0 0 10px #00ff41'
+        }}>{String(currentLevel + 1).padStart(2, '0')}</span>
+        <span style={{
+          fontSize: 9, letterSpacing: 2,
+          color: scoreFlash ? '#00ff41' : '#006622',
+          textShadow: scoreFlash ? '0 0 10px #00ff41' : 'none',
+          transition: 'all 0.2s'
+        }}>
+          {score.toString().padStart(6, '0')} PTS
         </span>
       </div>
 
-      {/* Energy */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#006622', fontWeight: 'bold' }}>PWR</span>
-        <div style={{ width: 80, height: 10, background: '#001100', border: '1px solid #003300', borderRadius: 3, overflow: 'hidden', boxShadow: 'inset 0 0 3px #000' }}>
+      {/* Energy bar */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: '#006622', marginBottom: 3, letterSpacing: 2 }}>
+          <span>ENERGY</span>
+          <span style={{ color: energyColor }}>{energyPct}%</span>
+        </div>
+        <div style={{ height: 6, background: '#001a00', borderRadius: 2, overflow: 'hidden', border: '1px solid #002200' }}>
           <div style={{
-            width: `${energyPct}%`,
-            height: '100%',
+            height: '100%', width: `${energyPct}%`,
             background: energyColor,
-            transition: 'all 0.2s ease',
-            boxShadow: `inset 0 0 2px ${energyColor}99`
+            boxShadow: `0 0 6px ${energyColor}`,
+            transition: 'width 0.3s ease, background 0.3s',
+            borderRadius: 2
           }} />
         </div>
-        <span style={{ color: energyColor, fontWeight: energyPct < 30 ? 'bold' : 'normal' }}>{bot.energy.toFixed(0)}%</span>
       </div>
 
-      {/* Bot state */}
-      <div style={{ color: '#006622' }}>
-        <span style={{ color: '#00d4ff', fontFamily: 'var(--font-mono)' }}>[{bot.x},{bot.y}]</span>
-        {' '}
-        <span style={{ color: '#ffb000' }}>{dirNames[bot.direction]}</span>
-      </div>
-
-      {/* Nodes */}
-      <div style={{ color: '#006622' }}>
-        NODES <span style={{ color: '#00ff41', fontWeight: 'bold' }}>{nodesCollected}/{nodesTotal}</span>
-      </div>
-
-      {/* Score */}
-      <div style={{ color: '#006622' }}>
-        SCR <span style={{ color: '#ffb000', fontWeight: 'bold' }}>{score}</span>
-      </div>
-
-      {/* Warning */}
-      {memoryStats.overflow && (
-        <div style={{ color: '#ff0040', animation: 'blink 0.6s infinite', letterSpacing: 2, fontSize: 9, fontWeight: 'bold', marginLeft: 8 }}>
-          ⚠ OVERFLOW
+      {/* Node collection */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 8, letterSpacing: 2, color: '#006622' }}>DATA NODES</span>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {Array.from({ length: totalNodes }).map((_, i) => (
+            <div key={i} style={{
+              width: 10, height: 10,
+              background: i < collectedNodes.length ? '#00ff41' : '#001a00',
+              border: `1px solid ${i < collectedNodes.length ? '#00ff41' : '#003300'}`,
+              boxShadow: i < collectedNodes.length ? '0 0 6px #00ff41' : 'none',
+              borderRadius: 2,
+              transition: 'all 0.2s'
+            }} />
+          ))}
         </div>
-      )}
+      </div>
 
-      {/* Controls */}
-      <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-        {status === 'running' ? (
-          <button
-            onClick={onStop}
-            aria-label="Halt execution"
-            style={{
-              fontSize: 10,
-              padding: '4px 12px',
-              border: '1px solid #ff0040',
-              color: '#ff0040',
-              background: 'transparent',
-              cursor: 'pointer',
-              fontFamily: 'var(--font-mono)',
-              transition: 'all 0.15s',
-              letterSpacing: 2,
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#ff0040'; e.currentTarget.style.color = '#000' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#ff0040' }}
-          >
-            ■ HALT
+      {/* Bot stats */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4,
+        fontSize: 8, color: '#006622', letterSpacing: 1
+      }}>
+        <div style={{ background: '#010601', border: '1px solid #002200', padding: '3px 5px', borderRadius: 2 }}>
+          <div>POS</div>
+          <div style={{ color: '#00ff41', fontFamily: 'monospace', fontSize: 10 }}>
+            {bot.x},{bot.y}
+          </div>
+        </div>
+        <div style={{ background: '#010601', border: '1px solid #002200', padding: '3px 5px', borderRadius: 2 }}>
+          <div>DIR</div>
+          <div style={{ color: '#00d4ff', fontSize: 10 }}>
+            {['▶ E','▼ S','◀ W','▲ N'][bot.direction] ?? '?'}
+          </div>
+        </div>
+        <div style={{ background: '#010601', border: '1px solid #002200', padding: '3px 5px', borderRadius: 2 }}>
+          <div>PROG COST</div>
+          <div style={{ color: totalCost > bot.energy ? '#ff0040' : '#ffb000', fontSize: 10 }}>
+            {totalCost} E
+          </div>
+        </div>
+        <div style={{ background: '#010601', border: '1px solid #002200', padding: '3px 5px', borderRadius: 2 }}>
+          <div>BLOCKS</div>
+          <div style={{ color: '#bf00ff', fontSize: 10 }}>
+            {blocks.length}
+          </div>
+        </div>
+      </div>
+
+      {/* Status badge */}
+      <div style={{
+        textAlign: 'center', fontSize: 9, letterSpacing: 3, padding: '3px 0',
+        color: running ? '#00ff41' : won ? '#ffb000' : lost ? '#ff0040' : '#006622',
+        textShadow: running ? '0 0 8px #00ff41' : won ? '0 0 8px #ffb000' : lost ? '0 0 8px #ff0040' : 'none',
+        borderTop: '1px solid #002200', borderBottom: '1px solid #002200',
+        animation: running ? 'flicker 3s infinite' : 'none'
+      }}>
+        {running ? '⚙ EXECUTING...' : won ? '✓ LEVEL CLEAR' : lost ? '✗ TERMINATED' : '■ STANDBY'}
+      </div>
+
+      {/* Control buttons */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 'auto' }}>
+        {won ? (
+          <button onClick={onNext} style={{ letterSpacing: 2, fontSize: 10, padding: '7px 0' }}>
+            ▶ NEXT LEVEL
+          </button>
+        ) : lost ? (
+          <button onClick={onReset} className="danger" style={{ letterSpacing: 2, fontSize: 10, padding: '7px 0' }}>
+            ↺ RETRY
+          </button>
+        ) : running ? (
+          <button onClick={onStop} className="danger" style={{ letterSpacing: 2, fontSize: 10, padding: '7px 0' }}>
+            ■ ABORT
           </button>
         ) : (
-          <button
-            onClick={onRun}
-            disabled={memoryStats.overflow}
-            aria-label="Execute program"
-            style={{
-              fontSize: 10,
-              padding: '4px 12px',
-              border: '1px solid #00ff41',
-              color: '#00ff41',
-              background: 'transparent',
-              cursor: memoryStats.overflow ? 'not-allowed' : 'pointer',
-              fontFamily: 'var(--font-mono)',
-              transition: 'all 0.15s',
-              letterSpacing: 2,
-              opacity: memoryStats.overflow ? 0.4 : 1,
-            }}
-            onMouseEnter={e => !memoryStats.overflow && (e.currentTarget.style.background = '#00ff41', e.currentTarget.style.color = '#000')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = '#00ff41')}
-          >
-            ▶ EXEC
-          </button>
+          <>
+            <button onClick={onRun} disabled={blocks.length === 0} style={{ letterSpacing: 2, fontSize: 10, padding: '7px 0' }}>
+              ▶ EXECUTE
+            </button>
+            <button onClick={onReset} style={{ letterSpacing: 1, fontSize: 9, padding: '5px 0', opacity: 0.7 }}>
+              ↺ RESET
+            </button>
+          </>
         )}
-        <button
-          onClick={onReset}
-          aria-label="Reset level"
-          style={{
-            fontSize: 10,
-            padding: '4px 12px',
-            border: '1px solid #ffb000',
-            color: '#ffb000',
-            background: 'transparent',
-            cursor: 'pointer',
-            fontFamily: 'var(--font-mono)',
-            transition: 'all 0.15s',
-            letterSpacing: 2,
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = '#ffb000'; e.currentTarget.style.color = '#000' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#ffb000' }}
-        >
-          ↺ RST
-        </button>
+      </div>
+
+      {/* System info footer */}
+      <div style={{ fontSize: 7, color: '#003300', letterSpacing: 1, textAlign: 'center', marginTop: 4 }}>
+        PROTOCOLO-ORION v2.0 // ENLACE-NEURONAL
       </div>
     </div>
   )
