@@ -1,256 +1,351 @@
-import React, { useRef, useEffect, useMemo } from 'react'
+import React, { useRef, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import { CELL } from '../levels/levelData'
 
-const CELL_SIZE = 36
-const COLORS = {
-  [CELL.EMPTY]: '#050f05',
-  [CELL.WALL]: '#001a00',
-  [CELL.NODE]: '#00ff41',
-  [CELL.EXIT]: '#ffb000',
-  [CELL.AND_GATE]: '#00d4ff',
-  [CELL.OR_GATE]: '#bf00ff',
-  [CELL.NOT_GATE]: '#ff6600',
-  [CELL.XOR_GATE]: '#ff0040',
+const CELL_SIZE = 38
+const ISO_W = CELL_SIZE * 1.2
+const ISO_H = CELL_SIZE * 0.6
+
+// Isometric projection helpers
+function isoX(x, y) { return (x - y) * (ISO_W / 2) }
+function isoY(x, y) { return (x + y) * (ISO_H / 2) }
+
+const WALL_COLOR   = '#001a00'
+const WALL_TOP     = '#003300'
+const EMPTY_COLOR  = '#020d02'
+const GATE_COLORS  = { [CELL.AND_GATE]: '#00d4ff', [CELL.OR_GATE]: '#bf00ff', [CELL.NOT_GATE]: '#ff6600', [CELL.XOR_GATE]: '#ff0040' }
+
+function spawnParticles(arr, x, y, color, count = 6) {
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5
+    arr.push({ x, y, vx: Math.cos(angle) * (1 + Math.random() * 2), vy: Math.sin(angle) * (1 + Math.random() * 2), life: 1, color })
+  }
 }
 
 const Viewport = React.memo(function Viewport() {
   const canvasRef = useRef(null)
   const { bot, enemies, levelData, collectedNodes, status, executionStep } = useSelector(s => s.game)
-  const animRef = useRef({ botX: bot.x, botY: bot.y, tick: 0, particles: [] })
+  const stateRef = useRef({
+    tick: 0,
+    particles: [],
+    prevCollected: [],
+    prevBot: { x: bot.x, y: bot.y },
+    botLerp: { x: bot.x, y: bot.y },
+    enemyLerps: {},
+  })
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext('2d', { alpha: true })
+    const ctx = canvas.getContext('2d')
     let raf
-    ctx.imageSmoothingEnabled = true
-    ctx.imageSmoothingQuality = 'high'
 
-    function drawCell(x, y, type, isActive) {
-      const px = x * CELL_SIZE
-      const py = y * CELL_SIZE
-      const color = COLORS[type] ?? '#050f05'
+    function resize() {
+      canvas.width = canvas.offsetWidth
+      canvas.height = canvas.offsetHeight
+    }
+    resize()
+    window.addEventListener('resize', resize)
 
-      ctx.fillStyle = color
-      if (type === CELL.WALL) {
-        ctx.fillStyle = '#001a00'
-        ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE)
-        ctx.strokeStyle = '#003300'
-        ctx.lineWidth = 1
-        ctx.strokeRect(px + 0.5, py + 0.5, CELL_SIZE - 1, CELL_SIZE - 1)
+    function isoToScreen(gx, gy, cx, cy) {
+      return [cx + isoX(gx, gy), cy + isoY(gx, gy)]
+    }
+
+    function drawIsoTile(ctx, gx, gy, cx, cy, fillTop, fillLeft, fillRight, h = ISO_H * 0.5) {
+      const [sx, sy] = isoToScreen(gx, gy, cx, cy)
+      const hw = ISO_W / 2
+      const hh = ISO_H / 2
+
+      // Top face
+      ctx.beginPath()
+      ctx.moveTo(sx, sy)
+      ctx.lineTo(sx + hw, sy + hh)
+      ctx.lineTo(sx, sy + ISO_H)
+      ctx.lineTo(sx - hw, sy + hh)
+      ctx.closePath()
+      ctx.fillStyle = fillTop
+      ctx.fill()
+      ctx.strokeStyle = '#003300'
+      ctx.lineWidth = 0.5
+      ctx.stroke()
+
+      if (h > 0) {
+        // Left face
+        ctx.beginPath()
+        ctx.moveTo(sx - hw, sy + hh)
+        ctx.lineTo(sx, sy + ISO_H)
+        ctx.lineTo(sx, sy + ISO_H + h)
+        ctx.lineTo(sx - hw, sy + hh + h)
+        ctx.closePath()
+        ctx.fillStyle = fillLeft
+        ctx.fill()
         ctx.strokeStyle = '#002200'
         ctx.lineWidth = 0.5
-        for (let i = 0; i < CELL_SIZE; i += 8) {
-          ctx.beginPath(); ctx.moveTo(px + i, py); ctx.lineTo(px + i, py + CELL_SIZE); ctx.stroke()
-        }
-      } else {
-        ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE)
-        ctx.strokeStyle = '#003300'
-        ctx.lineWidth = 0.5
-        ctx.strokeRect(px + 0.5, py + 0.5, CELL_SIZE - 1, CELL_SIZE - 1)
-      }
+        ctx.stroke()
 
-      if (type >= 5 && type <= 8) {
-        const labels = ['AND', 'OR', 'NOT', 'XOR']
-        ctx.fillStyle = color
-        ctx.globalAlpha = 0.15
-        ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE)
-        ctx.globalAlpha = 1
-        ctx.fillStyle = color
-        ctx.font = `bold 8px monospace`
-        ctx.textAlign = 'center'
-        ctx.fillText(labels[type - 5], px + CELL_SIZE / 2, py + CELL_SIZE / 2 + 3)
-        ctx.strokeStyle = color
-        ctx.lineWidth = 1
-        ctx.strokeRect(px + 1, py + 1, CELL_SIZE - 2, CELL_SIZE - 2)
+        // Right face
+        ctx.beginPath()
+        ctx.moveTo(sx + hw, sy + hh)
+        ctx.lineTo(sx, sy + ISO_H)
+        ctx.lineTo(sx, sy + ISO_H + h)
+        ctx.lineTo(sx + hw, sy + hh + h)
+        ctx.closePath()
+        ctx.fillStyle = fillRight
+        ctx.fill()
+        ctx.strokeStyle = '#002200'
+        ctx.lineWidth = 0.5
+        ctx.stroke()
       }
     }
 
-    function drawDataNode(n, collected, tick) {
-      if (collected) return
-      const px = n.x * CELL_SIZE + CELL_SIZE / 2
-      const py = n.y * CELL_SIZE + CELL_SIZE / 2
-      const pulse = Math.sin(tick * 0.08 + n.id) * 3 + 6
-      const wobble = Math.sin(tick * 0.05 + n.id * 0.7) * 2
-
+    function drawGlowDiamond(ctx, sx, sy, color, size, alpha = 1) {
       ctx.save()
-      ctx.shadowColor = '#00ff41'
-      ctx.shadowBlur = 12 + pulse
-      ctx.strokeStyle = '#00ff41'
+      ctx.globalAlpha = alpha
+      ctx.shadowColor = color
+      ctx.shadowBlur = 18
+      ctx.strokeStyle = color
       ctx.lineWidth = 1.5
       ctx.beginPath()
-      ctx.arc(px + wobble, py, pulse, 0, Math.PI * 2)
-      ctx.stroke()
-
-      ctx.fillStyle = '#00ff41'
-      ctx.font = '8px monospace'
-      ctx.textAlign = 'center'
-      ctx.fillText('◆', px + wobble, py + 3)
-      ctx.restore()
-    }
-
-    function drawExit(exit, tick) {
-      const px = exit.x * CELL_SIZE
-      const py = exit.y * CELL_SIZE
-      const pulse = Math.sin(tick * 0.05) * 0.3 + 0.7
-      const rotate = tick * 0.02
-
-      ctx.save()
-      ctx.globalAlpha = pulse
-      ctx.fillStyle = '#ffb00022'
-      ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE)
-      ctx.strokeStyle = '#ffb000'
-      ctx.lineWidth = 2
-      ctx.shadowColor = '#ffb000'
-      ctx.shadowBlur = 10
-      ctx.strokeRect(px + 2, py + 2, CELL_SIZE - 4, CELL_SIZE - 4)
-
-      // Rotating inner indicator
-      ctx.save()
-      ctx.translate(px + CELL_SIZE / 2, py + CELL_SIZE / 2)
-      ctx.rotate(rotate)
-      ctx.fillStyle = '#ffb000'
-      ctx.globalAlpha = pulse
-      ctx.font = '16px monospace'
-      ctx.textAlign = 'center'
-      ctx.fillText('⬡', 0, 6)
-      ctx.restore()
-      ctx.restore()
-    }
-
-    function drawBot(bx, by, direction, energy, tick) {
-      const px = bx * CELL_SIZE + CELL_SIZE / 2
-      const py = by * CELL_SIZE + CELL_SIZE / 2
-      const r = CELL_SIZE * 0.32
-      const thruster = Math.sin(tick * 0.12) * 0.5 + 0.5
-
-      ctx.save()
-      ctx.shadowColor = energy < 20 ? '#ff0040' : '#00ff41'
-      ctx.shadowBlur = 16 + thruster * 8
-      ctx.strokeStyle = energy < 20 ? '#ff0040' : '#00ff41'
-      ctx.lineWidth = 2
-      ctx.beginPath()
-      ctx.arc(px, py, r, 0, Math.PI * 2)
-      ctx.stroke()
-
-      ctx.fillStyle = energy < 20 ? '#1a0000' : '#001a00'
-      ctx.fill()
-
-      // Direction indicator
-      const angle = direction * Math.PI / 2 - Math.PI / 2
-      ctx.beginPath()
-      ctx.moveTo(px + Math.cos(angle) * (r - 4), py + Math.sin(angle) * (r - 4))
-      ctx.lineTo(px + Math.cos(angle + 2.5) * (r - 10), py + Math.sin(angle + 2.5) * (r - 10))
-      ctx.lineTo(px + Math.cos(angle - 2.5) * (r - 10), py + Math.sin(angle - 2.5) * (r - 10))
+      ctx.moveTo(sx, sy - size)
+      ctx.lineTo(sx + size, sy)
+      ctx.lineTo(sx, sy + size)
+      ctx.lineTo(sx - size, sy)
       ctx.closePath()
-      ctx.fillStyle = energy < 20 ? '#ff0040' : '#00ff41'
-      ctx.shadowBlur = 8
+      ctx.stroke()
+      ctx.fillStyle = color + '22'
       ctx.fill()
-
-      // Thruster effect
-      if (status === 'running') {
-        ctx.fillStyle = `rgba(0, ${255 - energy * 1.5}, 65, ${thruster * 0.6})`
-        ctx.beginPath()
-        ctx.arc(px - Math.cos(angle) * r, py - Math.sin(angle) * r, 2 + thruster * 3, 0, Math.PI * 2)
-        ctx.fill()
-      }
-
-      ctx.fillStyle = '#000'
-      ctx.beginPath()
-      ctx.arc(px, py, 3, 0, Math.PI * 2)
-      ctx.fill()
-
       ctx.restore()
     }
 
-    function drawEnemy(e, tick) {
-      const px = e.x * CELL_SIZE + CELL_SIZE / 2
-      const py = e.y * CELL_SIZE + CELL_SIZE / 2
-      const r = CELL_SIZE * 0.28
-      const flicker = Math.sin(tick * 0.15 + e.id * 1.3) * 0.3 + 0.7
-      const drift = Math.sin(tick * 0.08 + e.id) * 1.5
+    function drawBot(ctx, lerp, direction, energy, tick, cx, cy) {
+      const [sx, sy] = isoToScreen(lerp.x, lerp.y, cx, cy)
+      const py = sy + ISO_H / 2
+      const pulse = Math.sin(tick * 0.1) * 3
+      const isLow = energy < 25
+      const col = isLow ? '#ff0040' : '#00ff41'
+
+      ctx.save()
+      ctx.shadowColor = col
+      ctx.shadowBlur = 14 + pulse
+
+      // Bot body — glowing hexagon
+      ctx.strokeStyle = col
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI / 3) * i - Math.PI / 6
+        const r = 9 + (status === 'running' ? pulse * 0.5 : 0)
+        i === 0 ? ctx.moveTo(sx + Math.cos(a) * r, py + Math.sin(a) * r)
+                : ctx.lineTo(sx + Math.cos(a) * r, py + Math.sin(a) * r)
+      }
+      ctx.closePath()
+      ctx.fillStyle = col + '22'
+      ctx.fill()
+      ctx.stroke()
+
+      // Direction arrow
+      const angle = direction * Math.PI / 2 - Math.PI / 2
+      const ax = sx + Math.cos(angle) * 6
+      const ay = py + Math.sin(angle) * 6
+      ctx.strokeStyle = col
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.moveTo(sx, py)
+      ctx.lineTo(ax, ay)
+      ctx.stroke()
+
+      // Thruster trail when running
+      if (status === 'running') {
+        for (let i = 1; i <= 3; i++) {
+          ctx.globalAlpha = 0.2 / i
+          ctx.fillStyle = col
+          ctx.beginPath()
+          ctx.arc(sx - Math.cos(angle) * i * 5, py - Math.sin(angle) * i * 5, 4 - i, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+      ctx.restore()
+    }
+
+    function drawEnemy(ctx, e, tick, cx, cy) {
+      const [sx, sy] = isoToScreen(e.x, e.y, cx, cy)
+      const py = sy + ISO_H / 2
+      const flicker = Math.sin(tick * 0.18 + e.id * 1.7) * 0.25 + 0.75
 
       ctx.save()
       ctx.globalAlpha = flicker
       ctx.shadowColor = '#ff0040'
-      ctx.shadowBlur = 14 + flicker * 10
+      ctx.shadowBlur = 18
       ctx.strokeStyle = '#ff0040'
       ctx.lineWidth = 1.5
-      ctx.beginPath()
-      ctx.moveTo(px + drift, py - r)
-      ctx.lineTo(px + r, py + drift)
-      ctx.lineTo(px + drift, py + r)
-      ctx.lineTo(px - r, py + drift)
-      ctx.closePath()
-      ctx.stroke()
-      ctx.fillStyle = '#1a0000'
-      ctx.fill()
+
+      // Spinning threat square
+      ctx.save()
+      ctx.translate(sx, py)
+      ctx.rotate(tick * 0.03 + e.id)
+      ctx.strokeRect(-7, -7, 14, 14)
+      ctx.fillStyle = '#ff004011'
+      ctx.fillRect(-7, -7, 14, 14)
+      ctx.restore()
+
       ctx.fillStyle = '#ff0040'
-      ctx.font = '10px monospace'
+      ctx.font = '9px monospace'
       ctx.textAlign = 'center'
-      ctx.fillText('✕', px + drift, py + 4)
-      ctx.globalAlpha = 1
+      ctx.fillText('✕', sx, py + 4)
       ctx.restore()
     }
 
-    function render() {
-      animRef.current.tick++
-      const tick = animRef.current.tick
-
-      if (!levelData) return
-
-      const grid = levelData.grid
-      const gridW = grid[0].length * CELL_SIZE
-      const gridH = grid.length * CELL_SIZE
-
-      canvas.width = canvas.offsetWidth
-      canvas.height = canvas.offsetHeight
-
-      const offsetX = Math.max(0, (canvas.width - gridW) / 2)
-      const offsetY = Math.max(0, (canvas.height - gridH) / 2)
+    function drawDataNode(ctx, n, collected, tick, cx, cy) {
+      if (collected) return
+      const [sx, sy] = isoToScreen(n.x, n.y, cx, cy)
+      const py = sy + ISO_H / 2
+      const bob = Math.sin(tick * 0.06 + n.id * 0.9) * 3
+      const pulse = Math.sin(tick * 0.08 + n.id) * 4 + 8
 
       ctx.save()
-      ctx.translate(offsetX, offsetY)
+      ctx.shadowColor = '#00ff41'
+      ctx.shadowBlur = pulse + 6
+      ctx.strokeStyle = '#00ff41'
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.arc(sx, py + bob, pulse * 0.4 + 3, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.fillStyle = '#00ff4122'
+      ctx.fill()
+      ctx.fillStyle = '#00ff41'
+      ctx.font = 'bold 10px monospace'
+      ctx.textAlign = 'center'
+      ctx.fillText('◈', sx, py + bob + 4)
+      ctx.restore()
+    }
 
+    function drawExit(ctx, exit, tick, cx, cy) {
+      const [sx, sy] = isoToScreen(exit.x, exit.y, cx, cy)
+      const py = sy + ISO_H / 2
+      const pulse = Math.sin(tick * 0.04) * 0.35 + 0.65
+
+      ctx.save()
+      ctx.globalAlpha = pulse
+      ctx.shadowColor = '#ffb000'
+      ctx.shadowBlur = 20
+      ctx.strokeStyle = '#ffb000'
+      ctx.lineWidth = 2
+      ctx.save()
+      ctx.translate(sx, py)
+      ctx.rotate(tick * 0.015)
+      ctx.strokeRect(-10, -10, 20, 20)
+      ctx.restore()
+      ctx.fillStyle = '#ffb000'
+      ctx.font = '14px monospace'
+      ctx.textAlign = 'center'
+      ctx.fillText('⬡', sx, py + 5)
+      ctx.restore()
+    }
+
+    function updateParticles(particles) {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i]
+        p.x += p.vx; p.y += p.vy
+        p.vx *= 0.9; p.vy *= 0.9
+        p.life -= 0.04
+        if (p.life <= 0) particles.splice(i, 1)
+      }
+    }
+
+    function drawParticles(ctx, particles) {
+      particles.forEach(p => {
+        ctx.save()
+        ctx.globalAlpha = p.life
+        ctx.shadowColor = p.color
+        ctx.shadowBlur = 8
+        ctx.fillStyle = p.color
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, 2, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+      })
+    }
+
+    function render() {
+      const s = stateRef.current
+      s.tick++
+      const tick = s.tick
+
+      if (!levelData) { raf = requestAnimationFrame(render); return }
+
+      // Lerp bot position
+      s.botLerp.x += (bot.x - s.botLerp.x) * 0.18
+      s.botLerp.y += (bot.y - s.botLerp.y) * 0.18
+
+      // Detect newly collected nodes → spawn particles
+      collectedNodes.forEach(id => {
+        if (!s.prevCollected.includes(id)) {
+          const n = levelData.dataNodes.find(n => n.id === id)
+          if (n) {
+            const cx = canvas.width / 2
+            const cy = canvas.height / 2 - (levelData.grid.length * ISO_H * 0.4)
+            const [sx, sy] = isoToScreen(n.x, n.y, cx, cy)
+            spawnParticles(s.particles, sx, sy + ISO_H / 2, '#00ff41', 10)
+          }
+          s.prevCollected.push(id)
+        }
+      })
+
+      updateParticles(s.particles)
+
+      const rows = levelData.grid.length
+      const cols = levelData.grid[0].length
+      const cx = canvas.width / 2
+      const cy = Math.max(40, canvas.height / 2 - rows * ISO_H * 0.5)
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.fillStyle = '#000'
-      ctx.fillRect(-offsetX, -offsetY, canvas.width, canvas.height)
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      for (let y = 0; y < grid.length; y++) {
-        for (let x = 0; x < grid[y].length; x++) {
-          drawCell(x, y, grid[y][x])
+      // Draw tiles back to front (painter's algorithm)
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const type = levelData.grid[y][x]
+          if (type === CELL.WALL) {
+            drawIsoTile(ctx, x, y, cx, cy, WALL_TOP, '#001500', '#001800', ISO_H * 0.7)
+          } else {
+            const gateCol = GATE_COLORS[type]
+            if (gateCol) {
+              drawIsoTile(ctx, x, y, cx, cy, gateCol + '33', gateCol + '18', gateCol + '22', ISO_H * 0.2)
+              const [sx, sy] = isoToScreen(x, y, cx, cy)
+              const labels = { [CELL.AND_GATE]: 'AND', [CELL.OR_GATE]: 'OR', [CELL.NOT_GATE]: 'NOT', [CELL.XOR_GATE]: 'XOR' }
+              ctx.save()
+              ctx.shadowColor = gateCol; ctx.shadowBlur = 8
+              ctx.fillStyle = gateCol; ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center'
+              ctx.fillText(labels[type], sx, sy + ISO_H + 4)
+              ctx.restore()
+            } else {
+              drawIsoTile(ctx, x, y, cx, cy, EMPTY_COLOR, '#010801', '#010a01', 0)
+            }
+          }
         }
       }
 
-      drawExit(levelData.exitPos, tick)
-
-      levelData.dataNodes.forEach(n => drawDataNode(n, collectedNodes.includes(n.id), tick))
-
-      enemies.forEach(e => drawEnemy(e, tick))
-
-      drawBot(bot.x, bot.y, bot.direction, bot.energy, tick)
-
-      if (status === 'running') {
-        ctx.strokeStyle = '#00ff4133'
-        ctx.lineWidth = 2
-        ctx.setLineDash([4, 4])
-        ctx.strokeRect(bot.x * CELL_SIZE + 1, bot.y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2)
-        ctx.setLineDash([])
-      }
-
-      ctx.restore()
+      drawExit(ctx, levelData.exitPos, tick, cx, cy)
+      levelData.dataNodes.forEach(n => drawDataNode(ctx, n, collectedNodes.includes(n.id), tick, cx, cy))
+      enemies.forEach(e => drawEnemy(ctx, e, tick, cx, cy))
+      drawBot(ctx, s.botLerp, bot.direction, bot.energy, tick, cx, cy)
+      drawParticles(ctx, s.particles)
 
       raf = requestAnimationFrame(render)
     }
 
     render()
-    return () => cancelAnimationFrame(raf)
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) }
   }, [bot, enemies, levelData, collectedNodes, status])
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <div className="panel-header" style={{ fontSize: 9 }}>VIEWPORT — SECTOR MAP</div>
-      <canvas ref={canvasRef} style={{ width: '100%', height: 'calc(100% - 22px)', display: 'block', background: '#000' }} />
+    <div style={{ width: '100%', height: '100%', position: 'relative', background: '#000' }}>
+      <div className="panel-header" style={{ fontSize: 9, letterSpacing: 3 }}>VIEWPORT — ISO SECTOR MAP</div>
+      <canvas
+        ref={canvasRef}
+        style={{ width: '100%', height: 'calc(100% - 22px)', display: 'block' }}
+      />
     </div>
   )
 })
